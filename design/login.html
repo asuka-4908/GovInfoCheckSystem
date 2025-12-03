@@ -1,0 +1,249 @@
+<html lang="zh-CN">
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>
+   证企智能舆情分析系统 - 登录
+  </title>
+  <script src="https://res.gemcoder.com/js/reload.js">
+  </script>
+  <script src="https://cdn.tailwindcss.com">
+  </script>
+  <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+  <script>
+   tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        primary: '#1E40AF',
+        // 政务蓝作为主色调
+        secondary: '#3B82F6',
+        // 辅助蓝色
+        neutral: '#64748B',
+        // 中性色
+        'neutral-light': '#F1F5F9',
+        // 浅灰色背景
+        'neutral-dark': '#1E293B' // 深色文本
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif']
+      },
+      boxShadow: {
+        'card': '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03)',
+        'card-hover': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+      }
+    }
+  }
+};
+  </script>
+  <style type="text/tailwindcss">
+   @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .bg-grid {
+                background-size: 40px 40px;
+                background-image: 
+                    linear-gradient(to right, rgba(30, 64, 175, 0.05) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(30, 64, 175, 0.05) 1px, transparent 1px);
+            }
+            .text-shadow-sm {
+                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            }
+            .transition-custom {
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+        }
+  </style>
+ </head>
+ <body class="min-h-screen bg-neutral-light bg-grid flex items-center justify-center p-4 font-sans text-neutral-dark">
+  <!-- [MODULE] a1b_登录页面容器 -->
+<div class="w-full max-w-6xl mx-auto flex flex-col items-center justify-center gap-8">
+   <!-- [MODULE] k2l_右侧登录表单区 -->
+<div class="w-full max-w-md">
+    <!-- [MODULE] m4n_登录卡片容器 -->
+    <div class="bg-white rounded-2xl shadow-card p-8 w-full transition-custom hover:shadow-card-hover">
+     <!-- [MODULE] o6p_登录表单标题 -->
+     <div class="mb-8 text-center">
+      <h2 class="text-[clamp(1.25rem,2vw,1.75rem)] font-bold mb-2">
+       账户登录
+      </h2>
+      <p class="text-neutral">
+       欢迎使用证企智能舆情分析系统
+      </p>
+     </div>
+     <!-- [/MODULE] o6p_登录表单标题 -- 包含登录标题和欢迎语 -->
+     <!-- [MODULE] q8r_登录表单 -->
+     <form class="space-y-6" id="login-form">
+      <!-- [MODULE] s0t_用户名输入框 -->
+      <div class="space-y-2">
+       <label class="block text-sm font-medium text-neutral-dark" for="username">
+        用户名
+       </label>
+       <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral">
+         <i class="fas fa-user">
+         </i>
+        </div>
+        <input class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom" id="username" name="username" placeholder="请输入用户名" required="" type="text"/>
+       </div>
+      </div>
+      <!-- [/MODULE] s0t_用户名输入框 -- 包含用户名标签和输入框，带用户图标 -->
+      <!-- [MODULE] u2v_密码输入框 -->
+      <div class="space-y-2">
+       <div class="flex items-center justify-between">
+        <label class="block text-sm font-medium text-neutral-dark" for="password">
+         密码
+        </label>
+        <a class="text-sm text-primary hover:text-primary/80 transition-custom" href="javascript:void(0);">
+         忘记密码?
+        </a>
+       </div>
+       <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral">
+         <i class="fas fa-lock">
+         </i>
+        </div>
+        <input class="w-full pl-10 pr-10 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-custom" id="password" name="password" placeholder="请输入密码" required="" type="password"/>
+        <button class="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral hover:text-neutral-dark transition-custom" id="toggle-password" type="button">
+         <i class="fas fa-eye-slash">
+         </i>
+        </button>
+       </div>
+      </div>
+      <!-- [/MODULE] u2v_密码输入框 -- 包含密码标签、输入框、显示/隐藏密码按钮和忘记密码链接 -->
+      <!-- [MODULE] x4y_登录选项 -->
+      <div class="flex items-center justify-between">
+       <div class="flex items-center">
+        <input class="h-4 w-4 text-primary focus:ring-primary/50 border-gray-300 rounded transition-custom" id="remember-me" name="remember-me" type="checkbox"/>
+        <label class="ml-2 block text-sm text-neutral" for="remember-me">
+         记住我
+        </label>
+       </div>
+       <div>
+        <a class="text-sm text-primary hover:text-primary/80 transition-custom" href="javascript:void(0);">
+         注册账号
+        </a>
+       </div>
+      </div>
+      <!-- [/MODULE] x4y_登录选项 -- 包含"记住我"复选框和注册账号链接 -->
+      <!-- [MODULE] z6a_登录按钮 -->
+      <button class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg transition-custom flex items-center justify-center" type="submit">
+       <span>
+        登录系统
+       </span>
+       <i class="fas fa-arrow-right ml-2">
+       </i>
+      </button>
+      <!-- [/MODULE] z6a_登录按钮 -- 主要登录操作按钮，带箭头图标 -->
+     </form>
+     <!-- [/MODULE] q8r_登录表单 -- 包含用户名、密码输入框，登录选项和登录按钮 -->
+     <!-- [MODULE] b8c_其他登录方式 -->
+     <div class="mt-8">
+      <div class="relative flex items-center">
+       <div class="flex-grow border-t border-gray-200">
+       </div>
+       <span class="flex-shrink mx-4 text-sm text-neutral">
+        其他登录方式
+       </span>
+       <div class="flex-grow border-t border-gray-200">
+       </div>
+      </div>
+      <div class="flex justify-center space-x-4 mt-6">
+       <a class="w-12 h-12 rounded-full bg-[#1DA1F2]/10 flex items-center justify-center text-[#1DA1F2] hover:bg-[#1DA1F2]/20 transition-custom" href="javascript:void(0);">
+        <i class="fab fa-twitter">
+        </i>
+       </a>
+       <a class="w-12 h-12 rounded-full bg-[#4267B2]/10 flex items-center justify-center text-[#4267B2] hover:bg-[#4267B2]/20 transition-custom" href="javascript:void(0);">
+        <i class="fab fa-facebook-f">
+        </i>
+       </a>
+       <a class="w-12 h-12 rounded-full bg-[#EA4335]/10 flex items-center justify-center text-[#EA4335] hover:bg-[#EA4335]/20 transition-custom" href="javascript:void(0);">
+        <i class="fab fa-google">
+        </i>
+       </a>
+      </div>
+     </div>
+     <!-- [/MODULE] b8c_其他登录方式 -- 包含社交媒体登录选项：Twitter、Facebook和Google -->
+    </div>
+    <!-- [/MODULE] m4n_登录卡片容器 -- 包含登录表单和其他登录方式 -->
+    <!-- [MODULE] d0e_版权信息 -->
+    <div class="text-center mt-8 text-sm text-neutral">
+     <p>
+      © 2023 证企智能舆情分析系统. 保留所有权利.
+     </p>
+    </div>
+    <!-- [/MODULE] d0e_版权信息 -- 包含系统版权声明 -->
+   </div>
+   <!-- [/MODULE] k2l_右侧登录表单区 -- 包含登录卡片和版权信息 -->
+  </div>
+  <!-- [/MODULE] a1b_登录页面容器 -- 包含左侧品牌展示区和右侧登录表单区 -->
+  <!-- [JSMOD] f2g_登录表单交互 -->
+  <script id="login-script">
+   document.addEventListener('DOMContentLoaded', function () {
+  // 获取DOM元素
+  var loginForm = document.getElementById('login-form');
+  var passwordInput = document.getElementById('password');
+  var togglePassword = document.getElementById('toggle-password');
+
+  // 密码显示/隐藏切换
+  togglePassword.addEventListener('click', function () {
+    var type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+    passwordInput.setAttribute('type', type);
+
+    // 切换图标
+    var icon = togglePassword.querySelector('i');
+    if (type === 'password') {
+      icon.classList.remove('fa-eye');
+      icon.classList.add('fa-eye-slash');
+    } else {
+      icon.classList.remove('fa-eye-slash');
+      icon.classList.add('fa-eye');
+    }
+  });
+
+  // 表单提交处理
+  loginForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    // 获取表单数据
+    var username = document.getElementById('username').value;
+    var password = passwordInput.value;
+    var rememberMe = document.getElementById('remember-me').checked;
+
+    // 简单表单验证
+    if (!username.trim() || !password.trim()) {
+      alert('请输入用户名和密码');
+      return;
+    }
+
+    // 模拟登录请求
+    console.log('登录信息:', {
+      username: username,
+      password: password,
+      rememberMe: rememberMe
+    });
+
+    // 这里可以添加实际的登录API调用
+    // 模拟登录成功
+    alert('登录成功！即将跳转到系统首页');
+    // 实际应用中这里会跳转到首页
+    // window.location.href = '/dashboard';
+  });
+
+  // 添加输入框聚焦效果
+  var inputElements = loginForm.querySelectorAll('input');
+  inputElements.forEach(function (input) {
+    input.addEventListener('focus', function () {
+      input.parentElement.classList.add('scale-[1.01]');
+      input.parentElement.style.transition = 'transform 0.2s ease';
+    });
+    input.addEventListener('blur', function () {
+      input.parentElement.classList.remove('scale-[1.01]');
+    });
+  });
+});
+  </script>
+  <!-- [/JSMOD] f2g_登录表单交互 -- 处理密码显示/隐藏切换、表单提交验证、输入框聚焦效果 -->
+ </body>
+</html>

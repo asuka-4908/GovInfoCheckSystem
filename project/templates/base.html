@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}GovBiz Monitor AI{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui-v2.13.2/layui/css/layui.css') }}">
+    <style>
+        .layui-layout-admin .layui-header {
+            background-color: #393D49;
+        }
+
+        .layui-logo {
+            color: #fff !important;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body class="layui-layout-body">
+    <div class="layui-layout layui-layout-admin">
+        <div class="layui-header">
+            <div class="layui-logo">
+                <img src="{{ settings.app_logo }}" alt="logo"
+                    style="height:28px;vertical-align:middle;margin-right:8px">
+                {{ settings.app_name }}
+            </div>
+            <ul class="layui-nav layui-layout-left">
+                <li class="layui-nav-item"><a href="{{ url_for('main.index') }}">控制台</a></li>
+                {% if current_user.is_admin %}
+                <li class="layui-nav-item"><a href="javascript:;">系统管理</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="{{ url_for('admin.user_list') }}">用户管理</a></dd>
+                        <dd><a href="{{ url_for('admin.role_list') }}">角色管理</a></dd>
+                        <dd><a href="{{ url_for('admin.settings') }}">系统设置</a></dd>
+                    </dl>
+                </li>
+                {% endif %}
+            </ul>
+            <ul class="layui-nav layui-layout-right">
+                <li class="layui-nav-item">
+                    <a href="javascript:;">
+                        <img src="{{ settings.app_logo }}" class="layui-nav-img" alt="avatar">
+                        {{ current_user.username }}
+                    </a>
+                </li>
+                <li class="layui-nav-item"><a href="{{ url_for('auth.logout') }}">退出</a></li>
+            </ul>
+        </div>
+
+        <div class="layui-side layui-bg-black">
+            <div class="layui-side-scroll">
+                <ul class="layui-nav layui-nav-tree" lay-filter="test">
+                    <li class="layui-nav-item layui-nav-itemed">
+                        <a href="javascript:;">舆情分析</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="{{ url_for('main.index') }}">最新报告</a></dd>
+                            <dd><a href="javascript:;">数据报表</a></dd>
+                        </dl>
+                    </li>
+                    {% if current_user.is_admin %}
+                    <li class="layui-nav-item">
+                        <a href="javascript:;">后台管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="{{ url_for('admin.user_list') }}">用户列表</a></dd>
+                            <dd><a href="{{ url_for('admin.role_list') }}">角色管理</a></dd>
+                            <dd><a href="{{ url_for('admin.settings') }}">系统设置</a></dd>
+                        </dl>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="layui-body" style="padding: 15px;">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                {% if category == 'error' %}
+                <div class="layui-alert layui-bg-red" style="margin-bottom: 15px; padding: 10px; color: #fff; text-align: center;">
+                  {{ message }}
+                </div>
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </div>
+
+        <div class="layui-footer">
+            <!-- 底部固定区域 -->
+            © 2025 GovBiz Monitor AI System
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='layui-v2.13.2/layui/layui.js') }}"></script>
+    <script>
+        layui.use('element', function () {
+            var element = layui.element;
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>登录 - GovBiz Monitor AI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='layui-v2.13.2/layui/css/layui.css') }}">
+    <style>
+        body { background-color: #f2f2f2; }
+        .login-main { width: 375px; margin: 0 auto; margin-top: 100px; background: #fff; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); border-radius: 4px; }
+        .login-header { text-align: center; padding: 20px 0; }
+        .login-header h2 { font-size: 24px; color: #333; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div class="login-main">
+        <div class="login-header">
+            <h2>{{ settings.app_name }}</h2>
+            <p>舆情洞察系统</p>
+        </div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              {% if category == 'error' %}
+              <div class="layui-alert layui-bg-red" style="margin-bottom: 15px; padding: 10px; color: #fff; text-align: center;">
+                {{ message }}
+              </div>
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form class="layui-form" action="{{ url_for('auth.login') }}" method="post">
+            <div class="layui-form-item">
+                <label class="layui-icon layui-icon-username" for="username"></label>
+                <input type="text" name="username" id="username" lay-verify="required" placeholder="用户名" autocomplete="off" class="layui-input" style="padding-left: 38px;">
+            </div>
+            <div class="layui-form-item" style="position: relative;">
+                <label class="layui-icon layui-icon-password" for="password"></label>
+                <input type="password" name="password" id="password" lay-verify="required" placeholder="密码" autocomplete="off" class="layui-input" style="padding-left: 38px;">
+            </div>
+            <div class="layui-form-item">
+                <button class="layui-btn layui-btn-fluid" lay-submit lay-filter="login">登 录</button>
+            </div>
+        </form>
+    </div>
+
+    <script src="{{ url_for('static', filename='layui-v2.13.2/layui/layui.js') }}"></script>
+    <script>
+        layui.use(['form', 'layer'], function(){
+            var form = layui.form;
+            var layer = layui.layer;
+            
+            // 登录表单提交
+            form.on('submit(login)', function(data){
+                // 可以在这里做loading效果
+                // layer.msg('登录中...', {icon: 16, shade: 0.3, time: 0});
+                return true;
+            });
+        });
+    </script>
+</body>
+</html>

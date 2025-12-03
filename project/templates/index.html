@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}系统首页 - GovBiz Monitor AI{% endblock %}
+
+{% block content %}
+<div class="layui-row layui-col-space15">
+    <div class="layui-col-md12">
+        <div class="layui-card">
+            <div class="layui-card-header">欢迎回来, {{ user.username }}</div>
+            <div class="layui-card-body">
+                当前角色: <span class="layui-badge layui-bg-blue">{{ user.role_name }}</span>
+                <hr>
+                <p>这里将展示最新的舆情分析报告概览。</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="layui-col-md12">
+        <div class="layui-card">
+            <div class="layui-card-header">用户数据 (API 测试)</div>
+            <div class="layui-card-body">
+                <button class="layui-btn" id="loadBtn">加载用户数据</button>
+                <table class="layui-table" id="userTable">
+                  <thead>
+                    <tr><th>ID</th><th>用户名</th><th>角色ID</th><th>创建时间</th></tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('loadBtn').addEventListener('click', async () => {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+          const data = await res.json();
+          const tbody = document.querySelector('#userTable tbody');
+          tbody.innerHTML = '';
+          for (const row of data) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${row.id}</td><td>${row.username}</td><td>${row.role_id}</td><td>${row.created_at}</td>`;
+            tbody.appendChild(tr);
+          }
+      } else {
+          alert('加载失败，请确保已登录');
+      }
+    });
+</script>
+{% endblock %}

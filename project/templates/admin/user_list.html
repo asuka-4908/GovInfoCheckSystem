@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}用户管理 - {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="layui-row layui-col-space15">
+  <div class="layui-col-md12">
+    <div class="layui-card">
+      <div class="layui-card-header">用户列表</div>
+      <div class="layui-card-body">
+        <table class="layui-table">
+          <thead>
+            <tr><th>ID</th><th>用户名</th><th>角色</th><th>创建时间</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td>{{ u.id }}</td>
+              <td>{{ u.username }}</td>
+              <td>{{ u.role_name }}</td>
+              <td>{{ u.created_at }}</td>
+              <td>
+                <form action="{{ url_for('admin.update_user', user_id=u.id) }}" method="post" style="display:inline-block">
+                  <select name="role_id" style="height:32px">
+                    {% for r in roles %}
+                    <option value="{{ r.id }}" {% if r.name == u.role_name %}selected{% endif %}>{{ r.name }}</option>
+                    {% endfor %}
+                  </select>
+                  <button class="layui-btn layui-btn-primary layui-btn-sm">更新角色</button>
+                </form>
+                <form action="{{ url_for('admin.delete_user', user_id=u.id) }}" method="post" style="display:inline-block;margin-left:5px">
+                  <button class="layui-btn layui-btn-danger layui-btn-sm">删除</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="layui-col-md12">
+    <div class="layui-card">
+      <div class="layui-card-header">添加用户</div>
+      <div class="layui-card-body">
+        <form class="layui-form" action="{{ url_for('admin.add_user') }}" method="post">
+          <div class="layui-form-item">
+            <label class="layui-form-label">用户名</label>
+            <div class="layui-input-block">
+              <input type="text" name="username" required placeholder="用户名" autocomplete="off" class="layui-input">
+            </div>
+          </div>
+          <div class="layui-form-item">
+            <label class="layui-form-label">密码</label>
+            <div class="layui-input-block">
+              <input type="password" name="password" required placeholder="密码" autocomplete="off" class="layui-input">
+            </div>
+          </div>
+          <div class="layui-form-item">
+            <label class="layui-form-label">角色</label>
+            <div class="layui-input-block">
+              <select name="role_id" lay-verify="required">
+                {% for r in roles %}
+                <option value="{{ r.id }}">{{ r.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="layui-form-item">
+            <div class="layui-input-block">
+              <button class="layui-btn" lay-submit>提交</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
