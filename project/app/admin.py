@@ -287,6 +287,15 @@ def crawlers_delete(crawler_id: int):
     execute_update("delete from crawlers where id = ?", [crawler_id])
     return jsonify({'code': 0, 'msg': '已删除'})
 
+@bp.post('/crawlers/toggle/<int:crawler_id>')
+def crawlers_toggle(crawler_id: int):
+    row = query_one("select enabled from crawlers where id = ?", [crawler_id])
+    if not row:
+        return jsonify({'code': 1, 'msg': '未找到'})
+    new_val = 0 if row['enabled'] == 1 else 1
+    execute_update("update crawlers set enabled = ? where id = ?", [new_val, crawler_id])
+    return jsonify({'code': 0, 'msg': '已更新', 'enabled': new_val})
+
 @bp.post('/crawlers/auto_rule')
 def crawlers_auto_rule():
     test_url = (request.form.get('test_url') or '').strip()
@@ -408,11 +417,11 @@ def crawlers_auto_rule():
 def warehouse():
     q = request.args.get('q', '').strip()
     page = request.args.get('page', type=int) or 1
-    page_size = request.args.get('page_size', type=int) or 20
+    page_size = request.args.get('page_size', type=int) or 10
     if page < 1:
         page = 1
-    if page_size < 5:
-        page_size = 5
+    if page_size < 1:
+        page_size = 1
     if page_size > 200:
         page_size = 200
     params = []
@@ -445,6 +454,57 @@ def warehouse_delete(rid: int):
     execute_update("delete from crawl_details where record_id = ?", [rid])
     execute_update("delete from crawl_records where id = ?", [rid])
     return jsonify({'code': 0, 'msg': '已删除'})
+
+@bp.post('/warehouse/batch_delete')
+def warehouse_batch_delete():
+    data = request.get_json(silent=True) or {}
+    ids = data.get('ids') or []
+    if not isinstance(ids, list) or not ids:
+        return jsonify({'code': 1, 'msg': '缺少ID列表'})
+    cnt = 0
+    for rid in ids:
+        try:
+            execute_update("delete from crawl_details where record_id = ?", [rid])
+            execute_update("delete from crawl_records where id = ?", [rid])
+            cnt += 1
+        except Exception:
+            pass
+    return jsonify({'code': 0, 'msg': '已批量删除', 'count': cnt})
+
+@bp.post('/warehouse/batch_collect')
+def warehouse_batch_collect():
+    data = request.get_json(silent=True) or {}
+    ids = data.get('ids') or []
+    if not isinstance(ids, list) or not ids:
+        return jsonify({'code': 1, 'msg': '缺少ID列表'})
+    import requests as _req
+    cnt = 0
+    for rid in ids:
+        try:
+            rec = query_one("select url, source from crawl_records where id = ?", [rid])
+            if not rec or not rec.get('url'):
+                continue
+            payload = {'url': rec.get('url'), 'source': rec.get('source') or ''}
+            try:
+                r = _req.post('http://127.0.0.1:5000/api/deep_crawl', json=payload, timeout=20)
+                j = r.json()
+            except Exception:
+                j = {'code': 1, 'msg': '采集失败'}
+            if isinstance(j, dict) and j.get('code') == 0:
+                content_text = j.get('content_text') or ''
+                content_html = j.get('content_html') or ''
+                title = j.get('title') or ''
+                if title:
+                    try:
+                        execute_update("update crawl_records set title=? where id=?", [title, rid])
+                    except Exception:
+                        pass
+                if content_text or content_html:
+                    execute_update("insert into crawl_details(record_id, url, content_text, content_html) select id, url, ?, ? from crawl_records where id=?", [content_text, content_html, rid])
+                    cnt += 1
+        except Exception:
+            pass
+    return jsonify({'code': 0, 'msg': '已批量采集', 'count': cnt})
 
 @bp.get('/warehouse/detail/<int:rid>')
 def warehouse_detail(rid: int):
@@ -627,6 +687,15 @@ def rules_update(rule_id: int):
 def rules_delete(rule_id: int):
     execute_update("delete from crawl_rules where id = ?", [rule_id])
     return jsonify({'code': 0, 'msg': '已删除'})
+
+@bp.post('/rules/toggle/<int:rule_id>')
+def rules_toggle(rule_id: int):
+    row = query_one("select enabled from crawl_rules where id = ?", [rule_id])
+    if not row:
+        return jsonify({'code': 1, 'msg': '未找到'})
+    new_val = 0 if row['enabled'] == 1 else 1
+    execute_update("update crawl_rules set enabled = ? where id = ?", [new_val, rule_id])
+    return jsonify({'code': 0, 'msg': '已更新', 'enabled': new_val})
 
 @bp.route('/ai_engines')
 def ai_engines():

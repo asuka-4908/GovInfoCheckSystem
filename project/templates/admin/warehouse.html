@@ -6,61 +6,47 @@
 <div class="layui-card">
   <div class="layui-card-header">数据仓库管理</div>
   <div class="layui-card-body">
-    <div class="layui-form" style="margin-bottom:10px">
+    <div class="layui-form warehouse-toolbar" style="margin-bottom:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <div class="layui-inline">
         <input type="text" id="q" value="{{ q }}" placeholder="关键词/标题/摘要" class="layui-input" style="width:260px">
       </div>
       <div class="layui-inline">
         <button class="layui-btn" id="btnSearch">查询</button>
         <button class="layui-btn layui-btn-normal" id="btnRefresh">刷新</button>
+        <button class="layui-btn layui-btn-danger" id="btnBatchDelete">批量删除</button>
+        <button class="layui-btn layui-btn-normal" id="btnBatchDeep">批量深度采集</button>
       </div>
     </div>
-    <div class="layui-form" style="margin-bottom:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <div class="layui-inline" style="display:flex;align-items:center;gap:8px">
-        <label class="layui-form-label" style="width:auto;padding-right:8px">每页</label>
-        <div class="layui-input-inline" style="width:110px">
-          <select id="pageSize" class="layui-input">
-            <option value="10" {% if page_size == 10 %}selected{% endif %}>10</option>
-            <option value="20" {% if page_size == 20 %}selected{% endif %}>20</option>
-            <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
-            <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
-          </select>
-        </div>
-      </div>
-      <div class="layui-inline" style="display:flex;align-items:center;gap:8px">
-        <label class="layui-form-label" style="width:auto;padding-right:8px">页数</label>
-        <div class="layui-input-inline" style="width:110px">
-          <input type="number" id="pageInput" value="{{ page }}" min="1" max="{{ pages }}" class="layui-input">
-        </div>
-      </div>
-      <div class="layui-inline op-actions">
-        <button class="layui-btn layui-btn-primary" id="btnPrev">上一页</button>
-        <button class="layui-btn layui-btn-primary" id="btnNext">下一页</button>
-        <button class="layui-btn" id="btnGo">跳转</button>
-      </div>
-      <div class="layui-inline" style="color:#999">共 {{ total }} 条，{{ pages }} 页</div>
-    </div>
-    <table class="layui-table">
+    <table class="layui-table warehouse-table">
+      <colgroup>
+        <col style="width:44px">
+        <col style="width:70px">
+        <col style="width:200px">
+        <col style="width:120px">
+        <col style="width:120px">
+        <col style="width:160px">
+        <col style="width:360px">
+      </colgroup>
       <thead>
         <tr>
+          <th class="col-check"><input type="checkbox" id="checkAll"></th>
           <th>序号</th>
-          <th>标题</th>
-          <th>来源</th>
-          <th>关键词</th>
-          <th>链接</th>
-          <th>创建时间</th>
+          <th class="col-title">标题</th>
+          <th class="col-source">来源</th>
+          <th class="col-keyword">关键词</th>
+          <th class="col-time">创建时间</th>
           <th>操作</th>
         </tr>
       </thead>
       <tbody>
         {% for r in rows %}
-        <tr data-id="{{ r.id }}" data-cover="{{ r.cover or '' }}">
-          <td>{{ loop.index }}</td>
-          <td>{{ r.title }}</td>
-          <td>{{ r.source }}</td>
-          <td>{{ r.keyword }}</td>
-          <td><a href="{{ r.url }}" target="_blank">打开</a></td>
-          <td>{{ r.created_at }}</td>
+        <tr data-id="{{ r.id }}" data-cover="{{ r.cover or '' }}" data-url="{{ r.url }}">
+          <td class="col-check"><input type="checkbox" class="row-check" value="{{ r.id }}"></td>
+          <td>{{ (page - 1) * page_size + loop.index }}</td>
+          <td class="col-title"><div class="cell-clip"><a href="{{ r.url }}" target="_blank" rel="noopener noreferrer">{{ r.title }}</a></div></td>
+          <td class="col-source">{{ r.source }}</td>
+          <td class="col-keyword">{{ r.keyword }}</td>
+          <td class="col-time">{{ r.created_at }}</td>
           <td>
             <div class="op-actions">
               <button class="layui-btn layui-btn-sm" data-action="edit"><i
@@ -77,6 +63,26 @@
         {% endfor %}
       </tbody>
     </table>
+    <div class="layui-form pager-wrap" style="margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center">
+      <div class="layui-inline" style="display:flex;align-items:center;gap:8px">
+        <label class="layui-form-label" style="width:auto;padding-right:8px">每页</label>
+        <div class="layui-input-inline" style="width:110px">
+          <input type="number" id="pageSizeInput" value="{{ page_size }}" min="1" max="200" class="layui-input">
+        </div>
+      </div>
+      <div class="layui-inline op-actions">
+        <button class="layui-btn layui-btn-primary" id="btnPrev">上一页</button>
+        <button class="layui-btn layui-btn-primary" id="btnNext">下一页</button>
+      </div>
+      <div class="layui-inline" style="color:#999">共 {{ total }} 条，{{ pages }} 页</div>
+      <div class="layui-inline" style="display:flex;align-items:center;gap:8px">
+        <label class="layui-form-label" style="width:auto;padding-right:8px">页数</label>
+        <div class="layui-input-inline" style="width:110px">
+          <input type="number" id="pageInput" value="{{ page }}" min="1" max="{{ pages }}" class="layui-input">
+        </div>
+        <button class="layui-btn" id="btnGo">跳转</button>
+      </div>
+    </div>
   </div>
   {% endblock %}
 
@@ -98,17 +104,52 @@
       }
       document.getElementById('btnSearch').addEventListener('click', function () {
         var q = document.getElementById('q').value.trim();
-        var ps = parseInt(document.getElementById('pageSize').value) || pageSize;
+        var psEl = document.getElementById('pageSizeInput');
+        var ps = (psEl ? parseInt(psEl.value) : pageSize) || pageSize;
         var url = '/admin/warehouse?page=1&page_size=' + ps;
         if (q) url += '&q=' + encodeURIComponent(q);
         location.href = url;
       });
       document.getElementById('btnRefresh').addEventListener('click', function () { location.href = '/admin/warehouse?page=1&page_size=' + pageSize; });
-      document.getElementById('pageSize').addEventListener('change', function(){ var ps = parseInt(this.value)||pageSize; goto(1, ps); });
+      var psInput = document.getElementById('pageSizeInput');
+      if (psInput){
+        var psTimer = null;
+        function applyPageSize(){ var val = parseInt(psInput.value)||pageSize; if (val < 1) val = 1; if (val > 200) val = 200; goto(1, val); }
+        function schedule(){ if (psTimer){ clearTimeout(psTimer); } psTimer = setTimeout(applyPageSize, 500); }
+        psInput.addEventListener('input', schedule);
+        psInput.addEventListener('keyup', function(e){ if (e.key === 'Enter'){ applyPageSize(); } });
+      }
       document.getElementById('btnPrev').addEventListener('click', function(){ goto(page-1, pageSize); });
       document.getElementById('btnNext').addEventListener('click', function(){ goto(page+1, pageSize); });
       document.getElementById('btnGo').addEventListener('click', function(){ var p = parseInt(document.getElementById('pageInput').value)||page; goto(p, pageSize); });
       try{ form.render(); }catch(e){}
+      // 批量选择
+      var checkAll = document.getElementById('checkAll');
+      if (checkAll) {
+        checkAll.addEventListener('change', function(){
+          document.querySelectorAll('.row-check').forEach(function(cb){ cb.checked = checkAll.checked; });
+        });
+      }
+      function getSelectedIds(){ return Array.from(document.querySelectorAll('.row-check:checked')).map(function(cb){ return parseInt(cb.value); }).filter(Boolean); }
+      // 批量删除
+      document.getElementById('btnBatchDelete').addEventListener('click', function(){
+        var ids = getSelectedIds();
+        if (!ids.length){ layer.msg('请先选择要删除的条目'); return; }
+        layer.confirm('确认批量删除选中条目及其详细？',{icon:3}, function(){
+          fetch('/admin/warehouse/batch_delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ids: ids }) })
+            .then(function(r){ return r.json(); })
+            .then(function(res){ if (res.code===0){ layer.msg('已删除 '+(res.count||ids.length)+' 条'); setTimeout(function(){ location.reload(); }, 600); } else { layer.msg(res.msg||'失败'); } });
+        });
+      });
+      // 批量深度采集
+      document.getElementById('btnBatchDeep').addEventListener('click', function(){
+        var ids = getSelectedIds();
+        if (!ids.length){ layer.msg('请先选择要采集的条目'); return; }
+        layer.msg('开始批量深度采集…');
+        fetch('/admin/warehouse/batch_collect', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ids: ids }) })
+          .then(function(r){ return r.json(); })
+          .then(function(res){ if (res.code===0){ layer.msg('已采集 '+(res.count||ids.length)+' 条'); } else { layer.msg(res.msg||'失败'); } });
+      });
       document.querySelector('table').addEventListener('click', function (e) {
         var t = e.target.closest('button');
         if (!t) return;
@@ -119,7 +160,7 @@
           var title = tr.children[1].textContent.trim();
           var source = tr.children[2].textContent.trim();
           var keyword = tr.children[3].textContent.trim();
-          var url = tr.children[4].querySelector('a').getAttribute('href');
+          var url = tr.getAttribute('data-url') || (tr.children[1].querySelector('a') && tr.children[1].querySelector('a').getAttribute('href')) || '';
           var cover = tr.getAttribute('data-cover') || '';
           var html = '<div style="padding:10px">'
             + '<div class="layui-form-item"><label class="layui-form-label">标题</label><div class="layui-input-block"><input id="f_title" value="' + (title || '') + '" class="layui-input"></div></div>'
@@ -164,4 +205,16 @@
       });
     });
   </script>
+  <style>
+    .warehouse-table { table-layout: fixed; width: 100%; }
+    .warehouse-table th, .warehouse-table td { word-break: break-all; }
+    .warehouse-table .cell-clip { max-height: 24px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .warehouse-table .op-actions { flex-wrap: nowrap; gap: 4px }
+    .warehouse-table .op-actions .layui-btn { padding: 0 8px }
+    .warehouse-toolbar{ position: sticky; top: 0; z-index: 9; background: #fff; padding: 6px 0 }
+    @media (max-width: 1260px){ .warehouse-table th.col-time, .warehouse-table td.col-time{ display:none; } }
+    
+    @media (max-width: 1080px){ .warehouse-table th.col-keyword, .warehouse-table td.col-keyword{ display:none; } }
+    @media (max-width: 960px){ .warehouse-table th.col-source, .warehouse-table td.col-source{ display:none; } }
+  </style>
   {% endblock %}
