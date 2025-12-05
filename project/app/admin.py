@@ -239,6 +239,99 @@ def crawl_manage():
     crawlers = query_all("select * from crawlers where enabled = 1 order by id asc")
     return render_template('admin/crawl_manage.html', crawlers=crawlers)
 
+@bp.route('/data_board')
+def data_board():
+    return render_template('admin/data_board.html')
+
+@bp.get('/data_board/latest')
+def data_board_latest():
+    try:
+        rows = query_all("select id, title, source, keyword, url, created_at from crawl_records order by datetime(created_at) desc limit 20")
+    except Exception:
+        rows = []
+    return jsonify({'code': 0, 'rows': rows})
+
+@bp.get('/data_board/heatmap')
+def data_board_heatmap():
+    def simple_heat(rows):
+        provinces = [
+            '北京','上海','天津','重庆','河北','山西','内蒙古','辽宁','吉林','黑龙江','江苏','浙江','安徽','福建','江西','山东','河南','湖北','湖南','广东','广西','海南','四川','贵州','云南','西藏','陕西','甘肃','青海','宁夏','新疆'
+        ]
+        p_counts = {p: 0 for p in provinces}
+        p_words = {p: {} for p in provinces}
+        for r in rows or []:
+            text = ((r.get('title') or '') + ' ' + (r.get('summary') or '')).strip()
+            kw = (r.get('keyword') or '').strip()
+            hit = []
+            for p in provinces:
+                if p and (p in text):
+                    hit.append(p)
+            if not hit:
+                continue
+            for p in set(hit):
+                p_counts[p] = p_counts.get(p, 0) + 1
+                if kw:
+                    d = p_words.get(p) or {}
+                    d[kw] = (d.get(kw) or 0) + 1
+                    p_words[p] = d
+        map_data = []
+        for p in provinces:
+            v = p_counts.get(p) or 0
+            if v > 0:
+                map_data.append({'name': p, 'value': int(v)})
+        top_words = []
+        for p in provinces:
+            wmap = p_words.get(p) or {}
+            if not wmap:
+                continue
+            arr = sorted([{'word': k, 'count': int(v)} for k, v in wmap.items()], key=lambda x: x['count'], reverse=True)[:5]
+            top_words.append({'region': p, 'words': arr})
+        return {'map': map_data, 'topWords': top_words}
+    try:
+        rows = query_all("select id, title, summary, source, keyword, url, created_at from crawl_records order by datetime(created_at) desc limit 500")
+    except Exception:
+        rows = []
+    eng = query_one("select * from ai_engines where enabled = 1 order by id desc limit 1")
+    if eng:
+        api_url = (eng.get('api_url') or '').strip().rstrip('/')
+        model = eng.get('model_name') or ''
+        headers = {'Authorization': f"Bearer {eng.get('api_key')}", 'Content-Type': 'application/json'}
+        chat_url = api_url + ('/chat/completions' if api_url.endswith('/v1') else '/v1/chat/completions')
+        sys_msg = (
+            "你是政务数据报表分析助手。根据给定的记录，推断记录涉及的省份或城市，并统计每个地区的热词热度。"
+            "仅输出JSON，结构:{\"map\":[{\"name\":\"省/市\",\"value\":整数}],\"topWords\":[{\"region\":\"省/市\",\"words\":[{\"word\":\"热词\",\"count\":整数}]}]}。"
+            "地区名称使用中国省级名称，如北京、上海、广东、四川等；热度为热词出现次数加权的整数；不要输出除JSON外的任何内容。"
+        )
+        user_msg = json.dumps(rows, ensure_ascii=False)
+        payload = {"model": model, "messages": [{"role": "system", "content": sys_msg}, {"role": "user", "content": user_msg}], "temperature": 0}
+        data_obj = None
+        try:
+            resp = requests.post(chat_url, headers=headers, json=payload, timeout=30)
+            if resp.status_code == 200:
+                d = resp.json()
+                content = ''
+                try:
+                    content = d.get('choices', [{}])[0].get('message', {}).get('content') or d.get('choices', [{}])[0].get('text') or d.get('output_text') or d.get('result') or ''
+                except Exception:
+                    content = ''
+                if content:
+                    try:
+                        data_obj = json.loads(content)
+                    except Exception:
+                        data_obj = None
+        except Exception:
+            data_obj = None
+        if isinstance(data_obj, dict) and ('map' in data_obj):
+            try:
+                m = data_obj.get('map') or []
+                t = data_obj.get('topWords') or []
+                if isinstance(m, list):
+                    return jsonify({'code': 0, 'map': m, 'topWords': t})
+            except Exception:
+                pass
+    out = simple_heat(rows)
+    return jsonify({'code': 0, 'map': out.get('map') or [], 'topWords': out.get('topWords') or []})
+
 @bp.route('/crawlers')
 def crawlers():
     execute_update("create table if not exists crawlers(\n        id integer primary key autoincrement,\n        name text unique not null,\n        module text,\n        callable text,\n        config text,\n        domain text,\n        enabled integer default 1,\n        created_at datetime default current_timestamp\n     )")

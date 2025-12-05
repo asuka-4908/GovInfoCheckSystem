@@ -16,24 +16,89 @@
             color: #fff !important;
             font-weight: bold;
         }
+
         /* 美化滚动条，保持与整体深色风格一致 */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #2F343B; }
-        ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #5FB878, #2F9688); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #66C18C, #38A39A); }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #2F343B;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #5FB878, #2F9688);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #66C18C, #38A39A);
+        }
+
         /* 统一进度条视觉风格 */
-        .layui-progress { background: #2F343B; border-radius: 6px; }
-        .layui-progress .layui-progress-bar { background: linear-gradient(90deg, #5FB878 0%, #38A39A 100%); border-radius: 6px; }
-        .layui-table { border-radius: 6px; overflow: hidden; }
-        .layui-table thead th { background: #f7f8fa; color: #555; font-weight: 600; }
-        .layui-table td, .layui-table th { padding: 10px 12px; }
-        .layui-table td { vertical-align: middle; }
-        .layui-table tbody tr:hover { background: #f9fbff; }
-        .layui-table img { border-radius: 6px; }
-        .layui-table a { color: #1E9FFF; }
-        .op-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-        .op-actions .layui-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; line-height: 30px; padding: 0 12px; border-radius: 6px; }
-        .op-actions .layui-btn i { font-size: 16px; }
+        .layui-progress {
+            background: #2F343B;
+            border-radius: 6px;
+        }
+
+        .layui-progress .layui-progress-bar {
+            background: linear-gradient(90deg, #5FB878 0%, #38A39A 100%);
+            border-radius: 6px;
+        }
+
+        .layui-table {
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .layui-table thead th {
+            background: #f7f8fa;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .layui-table td,
+        .layui-table th {
+            padding: 10px 12px;
+        }
+
+        .layui-table td {
+            vertical-align: middle;
+        }
+
+        .layui-table tbody tr:hover {
+            background: #f9fbff;
+        }
+
+        .layui-table img {
+            border-radius: 6px;
+        }
+
+        .layui-table a {
+            color: #1E9FFF;
+        }
+
+        .op-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .op-actions .layui-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            height: 30px;
+            line-height: 30px;
+            padding: 0 12px;
+            border-radius: 6px;
+        }
+
+        .op-actions .layui-btn i {
+            font-size: 16px;
+        }
     </style>
 </head>
 
@@ -45,7 +110,7 @@
                     style="height:28px;vertical-align:middle;margin-right:8px">
                 {{ settings.app_name }}
             </div>
-            
+
             <ul class="layui-nav layui-layout-right">
                 <li class="layui-nav-item">
                     <a href="javascript:;">
@@ -70,9 +135,10 @@
                             <dd><a href="{{ url_for('admin.crawl_manage') }}">数据采集管理</a></dd>
                             <dd><a href="{{ url_for('admin.warehouse') }}">数据仓库管理</a></dd>
                             <dd><a href="{{ url_for('admin.rules') }}">采集规则库</a></dd>
-        <dd><a href="{{ url_for('admin.ai_engines') }}">AI引擎管理</a></dd>
-        <dd><a href="{{ url_for('admin.ai_tools') }}">AI数据清洗分析</a></dd>
+                            <dd><a href="{{ url_for('admin.ai_engines') }}">AI引擎管理</a></dd>
+                            <dd><a href="{{ url_for('admin.ai_tools') }}">AI数据清洗分析</a></dd>
                             <dd><a href="{{ url_for('admin.crawlers') }}">爬虫管理</a></dd>
+                            <dd><a href="{{ url_for('admin.data_board') }}">数据大屏</a></dd>
                             {% endif %}
                         </dl>
                     </li>
@@ -83,13 +149,14 @@
         <div class="layui-body" style="padding: 15px;">
             {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-              {% for category, message in messages %}
-                {% if category == 'error' %}
-                <div class="layui-alert layui-bg-red" style="margin-bottom: 15px; padding: 10px; color: #fff; text-align: center;">
-                  {{ message }}
-                </div>
-                {% endif %}
-              {% endfor %}
+            {% for category, message in messages %}
+            {% if category == 'error' %}
+            <div class="layui-alert layui-bg-red"
+                style="margin-bottom: 15px; padding: 10px; color: #fff; text-align: center;">
+                {{ message }}
+            </div>
+            {% endif %}
+            {% endfor %}
             {% endif %}
             {% endwith %}
             {% block content %}{% endblock %}
@@ -104,7 +171,7 @@
             try {
                 var cur = location.pathname;
                 var links = document.querySelectorAll('.layui-side .layui-nav a[href]');
-                links.forEach(function(a){
+                links.forEach(function (a) {
                     var href = a.getAttribute('href');
                     if (!href) return;
                     var u = new URL(href, location.origin);
@@ -112,7 +179,7 @@
                         var dd = a.parentElement;
                         if (dd && dd.classList) dd.classList.add('layui-this');
                     }
-                    a.addEventListener('click', function(e){
+                    a.addEventListener('click', function (e) {
                         var h = a.getAttribute('href');
                         if (!h) return;
                         var pu = new URL(h, location.origin);
@@ -121,7 +188,7 @@
                         }
                     });
                 });
-            } catch(e) {}
+            } catch (e) { }
         });
     </script>
     {% block scripts %}{% endblock %}

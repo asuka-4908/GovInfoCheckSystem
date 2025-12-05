@@ -8,11 +8,6 @@
       <div class="layui-card-body">
         <div class="chat-wrap">
           <div id="chatList" class="chat-list"></div>
-          <div class="chat-tools">
-            <button id="btnClearChat" class="layui-btn layui-btn-primary">清空</button>
-            <button id="btnCopy" class="layui-btn">复制</button>
-            <button id="btnExport" class="layui-btn">导出MD</button>
-          </div>
         </div>
         <div class="chat-inputbar">
           <textarea id="prompt" class="prompt-input" placeholder="输入与 AI 对话内容，Enter 发送，Shift+Enter 换行"></textarea>
@@ -47,7 +42,6 @@ layui.use(['layer'], function(){
     lastTyping = typing;
     return {item:item, body:body, typing:typing};
   }
-  function lastAiBody(){ var list=document.getElementById('chatList'); var nodes=list.querySelectorAll('.chat-msg.ai .msg-body'); return nodes.length? nodes[nodes.length-1] : null; }
   function sendPrompt(){
     var prompt = document.getElementById('prompt').value.trim();
     if (!prompt){ layer.msg('请输入内容'); return; }
@@ -71,12 +65,20 @@ layui.use(['layer'], function(){
     if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); sendPrompt(); }
   });
   document.getElementById('btnStop').addEventListener('click', function(){ try{ currentES && currentES.close(); }catch(e){} try{ lastTyping && lastTyping.remove(); }catch(e){} });
-  document.getElementById('btnClearChat').addEventListener('click', function(){ var list=document.getElementById('chatList'); list.innerHTML=''; });
-  document.getElementById('btnCopy').addEventListener('click', function(){ var b=lastAiBody(); if(!b){ layer.msg('无可复制内容'); return; } var txt=b.innerText||''; try{ navigator.clipboard.writeText(txt); layer.msg('已复制'); }catch(e){ layer.msg('复制失败'); } });
-  document.getElementById('btnExport').addEventListener('click', function(){ var b=lastAiBody(); if(!b){ layer.msg('无可导出内容'); return; } var md=b.dataset.md || ''; if(!md){ md=b.innerText||''; } var blob=new Blob([md],{type:'text/markdown;charset=utf-8'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ai_analyze.md'; a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); },500); });
 });
 </script>
 <style>
+.chat-wrap{ display:flex; flex-direction:column; gap:12px; }
+.chat-list{ display:flex; flex-direction:column; gap:12px; padding-bottom:84px; }
+.chat-inputbar{ position:sticky; bottom:0; z-index:9; background:#fff; display:flex; gap:8px; align-items:flex-end; padding:8px 0; border-top:1px solid #eee }
+.prompt-input{ flex:1; min-height:48px; max-height:160px; resize:vertical }
+.chat-msg{ display:flex; gap:10px; align-items:flex-start }
+.chat-msg .role-ava{ width:32px; height:32px; border-radius:50%; background:#1E9FFF; color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px }
+.chat-msg.user .role-ava{ background:#5FB878 }
+.chat-msg .msg-body{ max-width:100%; word-break:break-word }
+.typing{ display:inline-flex; gap:4px; padding:4px 0 }
+.typing span{ width:6px; height:6px; border-radius:50%; background:#bbb; animation:blink 1s infinite }
+@keyframes blink{ 0%{opacity:.2} 50%{opacity:1} 100%{opacity:.2} }
 .result-table{ table-layout: fixed; }
 .result-table th, .result-table td{ word-break: break-all; }
 .result-table .cell-clip{ max-height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }

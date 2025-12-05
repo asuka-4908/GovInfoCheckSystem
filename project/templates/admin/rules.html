@@ -6,11 +6,11 @@
 <div class="layui-card">
   <div class="layui-card-header">采集规则库</div>
   <div class="layui-card-body">
-    <div class="layui-form" style="margin-bottom:10px">
+    <div class="layui-form" style="margin-bottom:10px;display:flex;gap:12px;align-items:center;flex-wrap:nowrap">
       <div class="layui-inline">
         <input type="text" id="q" value="{{ q }}" placeholder="按站点查询，如 example.com" class="layui-input" style="width:260px">
       </div>
-      <div class="layui-inline op-actions">
+      <div class="layui-inline op-actions" style="display:flex;gap:8px;align-items:center">
         <button class="layui-btn" id="btnSearch"><i class="layui-icon layui-icon-search"></i>查询</button>
         <button class="layui-btn layui-btn-normal" id="btnAdd"><i class="layui-icon layui-icon-add-1"></i>新增规则</button>
         <button class="layui-btn layui-btn-primary" id="btnRefresh">刷新</button>
