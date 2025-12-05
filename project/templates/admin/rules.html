@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}采集规则库 - {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">采集规则库</div>
+  <div class="layui-card-body">
+    <div class="layui-form" style="margin-bottom:10px">
+      <div class="layui-inline">
+        <input type="text" id="q" value="{{ q }}" placeholder="按站点查询，如 example.com" class="layui-input" style="width:260px">
+      </div>
+      <div class="layui-inline op-actions">
+        <button class="layui-btn" id="btnSearch"><i class="layui-icon layui-icon-search"></i>查询</button>
+        <button class="layui-btn layui-btn-normal" id="btnAdd"><i class="layui-icon layui-icon-add-1"></i>新增规则</button>
+        <button class="layui-btn layui-btn-primary" id="btnRefresh">刷新</button>
+      </div>
+    </div>
+    <table class="layui-table">
+      <thead>
+        <tr>
+          <th>序号</th>
+          <th>站点</th>
+          <th>标题XPath</th>
+          <th>内容XPath</th>
+          <th>Request Headers(JSON)</th>
+          <th>启用</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-id="{{ r.id }}">
+          <td>{{ loop.index }}</td>
+          <td>{{ r.site }}</td>
+          <td style="max-width:260px;word-break:break-all">{{ r.title_xpath }}</td>
+          <td style="max-width:260px;word-break:break-all">{{ r.content_xpath }}</td>
+          <td style="max-width:300px;word-break:break-all">{{ r.request_headers }}</td>
+          <td>{{ '是' if r.enabled == 1 else '否' }}</td>
+          <td>
+            <div class="op-actions">
+              <button class="layui-btn layui-btn-sm" data-action="edit"><i class="layui-icon layui-icon-edit"></i>编辑</button>
+              <button class="layui-btn layui-btn-sm layui-btn-danger" data-action="del"><i class="layui-icon layui-icon-delete"></i>删除</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+layui.use(['layer','form'], function(){
+  var layer = layui.layer;
+  document.getElementById('btnSearch').addEventListener('click', function(){
+    var q = document.getElementById('q').value.trim();
+    location.href = '/admin/rules?q=' + encodeURIComponent(q);
+  });
+  document.getElementById('btnRefresh').addEventListener('click', function(){ location.href = '/admin/rules'; });
+  document.getElementById('btnAdd').addEventListener('click', function(){
+    var html = '<div style="padding:10px">'
+      +'<div class="layui-form-item"><label class="layui-form-label">站点</label><div class="layui-input-block"><input id="f_site" placeholder="例如: example.com" class="layui-input"></div></div>'
+      +'<div class="layui-form-item"><label class="layui-form-label">标题XPath</label><div class="layui-input-block"><input id="f_title_xpath" class="layui-input" placeholder="//h1"></div></div>'
+      +'<div class="layui-form-item"><label class="layui-form-label">内容XPath</label><div class="layui-input-block"><input id="f_content_xpath" class="layui-input" placeholder="//div[@class=\'content\']"></div></div>'
+      +'<div class="layui-form-item"><label class="layui-form-label">Headers</label><div class="layui-input-block"><textarea id="f_headers" class="layui-textarea" placeholder="JSON格式，如 {\"user-agent\":\"...\"}"></textarea></div></div>'
+      +'<div class="layui-form-item"><label class="layui-form-label">启用</label><div class="layui-input-block"><input type="checkbox" id="f_enabled" checked></div></div>'
+      +'</div>';
+    layer.open({type:1,title:'新增规则',area:['700px','520px'],content:html,btn:['保存','取消'],yes:function(){
+      var fd = new FormData();
+      fd.append('site', document.getElementById('f_site').value.trim());
+      fd.append('title_xpath', document.getElementById('f_title_xpath').value);
+      fd.append('content_xpath', document.getElementById('f_content_xpath').value);
+      fd.append('request_headers', document.getElementById('f_headers').value);
+      fd.append('enabled', document.getElementById('f_enabled').checked ? '1' : '0');
+      fetch('/admin/rules/add', {method:'POST', body: fd})
+        .then(function(r){return r.json();})
+        .then(function(res){ if (res.code===0){ layer.msg('已添加'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
+    }});
+  });
+  document.querySelector('table').addEventListener('click', function(e){
+    var t = e.target.closest('button');
+    if (!t) return;
+    var tr = t.closest('tr');
+    if (!tr) return;
+    var id = tr.getAttribute('data-id');
+    if (t.dataset.action === 'edit') {
+      var site = tr.children[1].textContent.trim();
+      var title_xpath = tr.children[2].textContent.trim();
+      var content_xpath = tr.children[3].textContent.trim();
+      var headers = tr.children[4].textContent.trim();
+      var enabled = tr.children[5].textContent.trim() === '是';
+      var html = '<div style="padding:10px">'
+        +'<div class="layui-form-item"><label class="layui-form-label">站点</label><div class="layui-input-block"><input id="f_site" value="'+(site||'')+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">标题XPath</label><div class="layui-input-block"><input id="f_title_xpath" value="'+(title_xpath||'')+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">内容XPath</label><div class="layui-input-block"><input id="f_content_xpath" value="'+(content_xpath||'')+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">Headers</label><div class="layui-input-block"><textarea id="f_headers" class="layui-textarea">'+(headers||'')+'</textarea></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">启用</label><div class="layui-input-block"><input type="checkbox" id="f_enabled" '+(enabled? 'checked':'' )+'></div></div>'
+        +'</div>';
+      layer.open({type:1,title:'编辑规则',area:['700px','520px'],content:html,btn:['保存','取消'],yes:function(){
+        var fd = new FormData();
+        fd.append('site', document.getElementById('f_site').value.trim());
+        fd.append('title_xpath', document.getElementById('f_title_xpath').value);
+        fd.append('content_xpath', document.getElementById('f_content_xpath').value);
+        fd.append('request_headers', document.getElementById('f_headers').value);
+        fd.append('enabled', document.getElementById('f_enabled').checked ? '1' : '0');
+        fetch('/admin/rules/update/'+id, {method:'POST', body: fd})
+          .then(function(r){return r.json();})
+          .then(function(res){ if (res.code===0){ layer.msg('已保存'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
+      }});
+    }
+    if (t.dataset.action === 'del') {
+      layer.confirm('确认删除该规则？',{icon:3}, function(){
+        fetch('/admin/rules/delete/'+id, {method:'POST'})
+          .then(function(r){return r.json();})
+          .then(function(res){ if (res.code===0){ layer.msg('已删除'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
+      });
+    }
+  });
+});
+</script>
+{% endblock %}
+

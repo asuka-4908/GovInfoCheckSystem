@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, current_app
 from flask_login import login_required, current_user
 from .db import query_all
 
@@ -12,6 +12,13 @@ def index():
 @bp.get("/health")
 def health():
     return jsonify({"status": "ok"})
+
+@bp.get('/favicon.ico')
+def favicon():
+    try:
+        return current_app.send_static_file('images/logo.png')
+    except Exception:
+        return jsonify({"status":"no-favicon"}), 204
 
 @bp.get("/api/users")
 @login_required

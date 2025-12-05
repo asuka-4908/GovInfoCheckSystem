@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}AI引擎管理 - {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">AI引擎管理</div>
+  <div class="layui-card-body">
+    <div class="layui-form" style="margin-bottom:10px">
+      <div class="layui-inline">
+        <input type="text" id="q" value="{{ q }}" placeholder="服务商/模型名称" class="layui-input" style="width:260px">
+      </div>
+      <div class="layui-inline op-actions">
+        <button class="layui-btn" id="btnSearch">查询</button>
+        <button class="layui-btn layui-btn-normal" id="btnRefresh">刷新</button>
+        <button class="layui-btn layui-btn-warm" id="btnAdd"><i class="layui-icon layui-icon-add-circle"></i>新增引擎</button>
+      </div>
+    </div>
+    <div class="engine-grid">
+      {% for r in rows %}
+      <div class="engine-card" data-id="{{ r.id }}" data-enabled="{{ r.enabled }}">
+        <div class="engine-top">
+          <div class="engine-badge">{{ r.provider_name }}</div>
+          <div class="engine-model">{{ r.model_name }}</div>
+        </div>
+        <div class="engine-body">
+          <div class="engine-field">API URL：<span title="{{ r.api_url }}">{{ r.api_url }}</span></div>
+          <div class="engine-field">API Key：<span class="mask">{{ r.api_key[:4] }}****{{ r.api_key[-4:] if r.api_key|length>8 else '' }}</span></div>
+          <div class="engine-field">状态：<span class="tag {{ 'on' if r.enabled==1 else 'off' }}">{{ '启用' if r.enabled==1 else '停用' }}</span></div>
+        </div>
+        <div class="engine-actions">
+          <button class="layui-btn layui-btn-sm" data-action="edit"><i class="layui-icon layui-icon-edit"></i>编辑</button>
+          <button class="layui-btn layui-btn-sm layui-btn-danger" data-action="del"><i class="layui-icon layui-icon-delete"></i>删除</button>
+        </div>
+      </div>
+      {% endfor %}
+      {% if rows|length == 0 %}
+      <div style="color:#999;padding:20px">暂无引擎，请点击“新增引擎”进行添加</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<style>
+.engine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));grid-gap:16px}
+.engine-card{border-radius:12px;background:linear-gradient(135deg,#1f1c2c,#928dab);color:#fff;box-shadow:0 8px 16px rgba(0,0,0,.15);position:relative;overflow:hidden}
+.engine-top{padding:16px 16px 8px 16px}
+.engine-badge{font-size:14px;background:rgba(255,255,255,.15);display:inline-block;padding:4px 10px;border-radius:999px}
+.engine-model{font-size:18px;font-weight:700;margin-top:8px}
+.engine-body{background:rgba(0,0,0,.15);padding:12px 16px}
+.engine-field{font-size:13px;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.engine-actions{display:flex;gap:10px;padding:12px 16px}
+.mask{letter-spacing:1px}
+.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px}
+.tag.on{background:#16baaa}
+.tag.off{background:#ff5722}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+layui.use(['layer','form'], function(){
+  var layer = layui.layer;
+  document.getElementById('btnSearch').addEventListener('click', function(){
+    var q = document.getElementById('q').value.trim();
+    location.href = '/admin/ai_engines?q=' + encodeURIComponent(q);
+  });
+  document.getElementById('btnRefresh').addEventListener('click', function(){ location.href = '/admin/ai_engines'; });
+  document.getElementById('btnAdd').addEventListener('click', function(){
+    var html = '<div style="padding:12px">'
+      +'<div class="layui-form-item"><label class="layui-form-label">服务商</label><div class="layui-input-block"><input id="f_provider" class="layui-input"></div></div>'
+      +'<div class="layui-form-item"><label class="layui-form-label">API URL</label><div class="layui-input-block"><input id="f_url" class="layui-input" placeholder="https://api.openai.com/v1"></div></div>'
+      +'<div class="layui-form-item"><label class="layui-form-label">API Key</label><div class="layui-input-block"><input id="f_key" class="layui-input" type="password"></div></div>'
+      +'<div class="layui-form-item"><label class="layui-form-label">模型</label><div class="layui-input-block"><input id="f_model" class="layui-input" placeholder="gpt-4o-mini"></div></div>'
+      +'</div>';
+    layer.open({type:1,title:'新增引擎',area:['520px','420px'],content:html,btn:['保存','取消'],yes:function(){
+      var fd = new FormData();
+      fd.append('provider_name', document.getElementById('f_provider').value.trim());
+      fd.append('api_url', document.getElementById('f_url').value.trim());
+      fd.append('api_key', document.getElementById('f_key').value);
+      fd.append('model_name', document.getElementById('f_model').value.trim());
+      fd.append('enabled', '1');
+      fetch('/admin/ai_engines/add', {method:'POST', body: fd})
+        .then(function(r){return r.json();})
+        .then(function(res){ if (res.code===0){ layer.msg('已添加'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
+    }});
+  });
+  document.querySelector('.engine-grid').addEventListener('click', function(e){
+    var t = e.target;
+    var card = t.closest('.engine-card');
+    if (!card) return;
+    var id = card.getAttribute('data-id');
+    if (t.dataset.action === 'edit'){
+      var provider = card.querySelector('.engine-badge').textContent.trim();
+      var model = card.querySelector('.engine-model').textContent.trim();
+      var url = card.querySelector('.engine-body .engine-field span').getAttribute('title');
+      var enVal = card.getAttribute('data-enabled') === '1';
+      var html = '<div style="padding:12px">'
+        +'<div class="layui-form-item"><label class="layui-form-label">服务商</label><div class="layui-input-block"><input id="f_provider" value="'+provider+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">API URL</label><div class="layui-input-block"><input id="f_url" value="'+(url||'')+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">API Key</label><div class="layui-input-block"><input id="f_key" class="layui-input" type="password" placeholder="留空不变"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">模型</label><div class="layui-input-block"><input id="f_model" value="'+model+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">启用</label><div class="layui-input-block"><input type="checkbox" id="f_enabled" '+(enVal?'checked':'')+' class="layui-input"></div></div>'
+        +'</div>';
+      layer.open({type:1,title:'编辑引擎',area:['520px','460px'],content:html,btn:['保存','取消'],yes:function(){
+        var fd = new FormData();
+        fd.append('provider_name', document.getElementById('f_provider').value.trim());
+        fd.append('api_url', document.getElementById('f_url').value.trim());
+        var k = document.getElementById('f_key').value;
+        if (k){ fd.append('api_key', k); } else { fd.append('api_key', ''); }
+        fd.append('model_name', document.getElementById('f_model').value.trim());
+        fd.append('enabled', document.getElementById('f_enabled').checked ? '1' : '0');
+        fetch('/admin/ai_engines/update/'+id, {method:'POST', body: fd})
+          .then(function(r){return r.json();})
+          .then(function(res){ if (res.code===0){ layer.msg('已更新'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
+      }});
+    }
+    if (t.dataset.action === 'del'){
+      layer.confirm('确认删除该引擎？',{icon:3}, function(){
+        fetch('/admin/ai_engines/delete/'+id, {method:'POST'})
+          .then(function(r){return r.json();})
+          .then(function(res){ if (res.code===0){ layer.msg('已删除'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
+      });
+    }
+  });
+});
+</script>
+{% endblock %}

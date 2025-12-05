@@ -15,6 +15,24 @@
             color: #fff !important;
             font-weight: bold;
         }
+        /* 美化滚动条，保持与整体深色风格一致 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #2F343B; }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #5FB878, #2F9688); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #66C18C, #38A39A); }
+        /* 统一进度条视觉风格 */
+        .layui-progress { background: #2F343B; border-radius: 6px; }
+        .layui-progress .layui-progress-bar { background: linear-gradient(90deg, #5FB878 0%, #38A39A 100%); border-radius: 6px; }
+        .layui-table { border-radius: 6px; overflow: hidden; }
+        .layui-table thead th { background: #f7f8fa; color: #555; font-weight: 600; }
+        .layui-table td, .layui-table th { padding: 10px 12px; }
+        .layui-table td { vertical-align: middle; }
+        .layui-table tbody tr:hover { background: #f9fbff; }
+        .layui-table img { border-radius: 6px; }
+        .layui-table a { color: #1E9FFF; }
+        .op-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .op-actions .layui-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; line-height: 30px; padding: 0 12px; border-radius: 6px; }
+        .op-actions .layui-btn i { font-size: 16px; }
     </style>
 </head>
 
@@ -51,24 +69,23 @@
 
         <div class="layui-side layui-bg-black">
             <div class="layui-side-scroll">
-                <ul class="layui-nav layui-nav-tree" lay-filter="test">
+                <ul class="layui-nav layui-nav-tree" lay-filter="side">
                     <li class="layui-nav-item layui-nav-itemed">
-                        <a href="javascript:;">舆情分析</a>
+                        <a href="javascript:;">系统菜单</a>
                         <dl class="layui-nav-child">
-                            <dd><a href="{{ url_for('main.index') }}">最新报告</a></dd>
-                            <dd><a href="javascript:;">数据报表</a></dd>
-                        </dl>
-                    </li>
-                    {% if current_user.is_admin %}
-                    <li class="layui-nav-item">
-                        <a href="javascript:;">后台管理</a>
-                        <dl class="layui-nav-child">
-                            <dd><a href="{{ url_for('admin.user_list') }}">用户列表</a></dd>
-                            <dd><a href="{{ url_for('admin.role_list') }}">角色管理</a></dd>
+                            <dd><a href="{{ url_for('main.index') }}">首页</a></dd>
+                            {% if current_user.is_admin %}
+                            <dd><a href="{{ url_for('admin.settings') }}">后台管理</a></dd>
+                            <dd><a href="{{ url_for('admin.user_list') }}">用户管理</a></dd>
                             <dd><a href="{{ url_for('admin.settings') }}">系统设置</a></dd>
+                            <dd><a href="{{ url_for('admin.crawl_manage') }}">数据采集管理</a></dd>
+                            <dd><a href="{{ url_for('admin.warehouse') }}">数据仓库管理</a></dd>
+                            <dd><a href="{{ url_for('admin.rules') }}">采集规则库</a></dd>
+                            <dd><a href="{{ url_for('admin.ai_engines') }}">AI引擎管理</a></dd>
+                            <dd><a href="{{ url_for('admin.crawlers') }}">爬虫管理</a></dd>
+                            {% endif %}
                         </dl>
                     </li>
-                    {% endif %}
                 </ul>
             </div>
         </div>
@@ -88,10 +105,6 @@
             {% block content %}{% endblock %}
         </div>
 
-        <div class="layui-footer">
-            <!-- 底部固定区域 -->
-            © 2025 GovBiz Monitor AI System
-        </div>
     </div>
     <script src="{{ url_for('static', filename='layui-v2.13.2/layui/layui.js') }}"></script>
     <script>

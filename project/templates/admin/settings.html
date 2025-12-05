@@ -22,6 +22,48 @@
             </div>
           </div>
           <div class="layui-form-item">
+            <label class="layui-form-label">HTTP代理</label>
+            <div class="layui-input-block">
+              <input type="text" name="http_proxy" value="{{ settings.http_proxy }}" placeholder="http://127.0.0.1:7897" autocomplete="off" class="layui-input">
+            </div>
+          </div>
+          <div class="layui-form-item">
+            <label class="layui-form-label">HTTPS代理</label>
+            <div class="layui-input-block">
+              <input type="text" name="https_proxy" value="{{ settings.https_proxy }}" placeholder="http://127.0.0.1:7897" autocomplete="off" class="layui-input">
+            </div>
+          </div>
+          <div class="layui-form-item">
+            <label class="layui-form-label">User-Agent</label>
+            <div class="layui-input-block">
+              <input type="text" name="user_agent" value="{{ settings.user_agent }}" placeholder="Mozilla/5.0 ..." autocomplete="off" class="layui-input">
+            </div>
+          </div>
+          <div class="layui-form-item">
+            <label class="layui-form-label">Referer</label>
+            <div class="layui-input-block">
+              <input type="text" name="referer" value="{{ settings.referer }}" placeholder="https://www.baidu.com/" autocomplete="off" class="layui-input">
+            </div>
+          </div>
+          <div class="layui-form-item">
+            <label class="layui-form-label">sec-ch-ua</label>
+            <div class="layui-input-block">
+              <input type="text" name="sec_ch_ua" value="{{ settings.sec_ch_ua }}" placeholder='"Chromium";v="142", "Not_A Brand";v="99", "Google Chrome";v="142"' autocomplete="off" class="layui-input">
+            </div>
+          </div>
+          <div class="layui-form-item">
+            <label class="layui-form-label">sec-ch-ua-platform</label>
+            <div class="layui-input-block">
+              <input type="text" name="sec_ch_ua_platform" value="{{ settings.sec_ch_ua_platform }}" placeholder='"Windows"' autocomplete="off" class="layui-input">
+            </div>
+          </div>
+          <div class="layui-form-item">
+            <label class="layui-form-label">sec-ch-ua-mobile</label>
+            <div class="layui-input-block">
+              <input type="text" name="sec_ch_ua_mobile" value="{{ settings.sec_ch_ua_mobile }}" placeholder='?0' autocomplete="off" class="layui-input">
+            </div>
+          </div>
+          <div class="layui-form-item">
             <div class="layui-input-block">
               <button class="layui-btn" lay-submit>保存</button>
             </div>
@@ -41,4 +83,3 @@
   </div>
 </div>
 {% endblock %}
-

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}爬虫管理 - {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="layui-row layui-col-space15">
+  <div class="layui-col-md12">
+    <div class="layui-card">
+      <div class="layui-card-header">爬虫列表</div>
+      <div class="layui-card-body">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <input id="q" class="layui-input" placeholder="按名称/模块/函数搜索" style="max-width:300px">
+          <button class="layui-btn" id="btnSearch">查询</button>
+          <button class="layui-btn layui-btn-primary" id="btnRefresh">刷新</button>
+          <button class="layui-btn layui-btn-normal" id="btnAdd">新增</button>
+        </div>
+        <table class="layui-table">
+          <thead>
+            <tr><th>ID</th><th>名称</th><th>模块</th><th>函数</th><th>配置</th><th>启用</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+            <tr data-id="{{ r.id }}">
+              <td>{{ r.id }}</td>
+              <td>{{ r.name }}</td>
+              <td>{{ r.module }}</td>
+              <td>{{ r.callable }}</td>
+              <td style="max-width:320px;word-break:break-all">{{ r.config }}</td>
+              <td>{{ '是' if r.enabled == 1 else '否' }}</td>
+              <td>
+                <div class="op-actions">
+                  <button class="layui-btn layui-btn-sm" data-action="edit">编辑</button>
+                  <button class="layui-btn layui-btn-sm layui-btn-danger" data-action="del">删除</button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+layui.use(['layer','form'], function(){
+  var layer = layui.layer;
+  document.getElementById('btnSearch').addEventListener('click', function(){
+    var q = document.getElementById('q').value.trim();
+    location.href = '/admin/crawlers?q=' + encodeURIComponent(q);
+  });
+  document.getElementById('btnRefresh').addEventListener('click', function(){ location.href = '/admin/crawlers'; });
+  document.getElementById('btnAdd').addEventListener('click', function(){
+    var html = '<div style="padding:12px">'
+      +'<div class="layui-form-item"><label class="layui-form-label">名称</label><div class="layui-input-block"><input id="f_name" class="layui-input" placeholder="例如: baidu"></div></div>'
+      +'<div class="layui-form-item"><label class="layui-form-label">模块</label><div class="layui-input-block"><input id="f_module" class="layui-input" placeholder="app.crawlers.baidu"></div></div>'
+      +'<div class="layui-form-item"><label class="layui-form-label">函数</label><div class="layui-input-block"><input id="f_callable" class="layui-input" placeholder="run"></div></div>'
+      +'<div class="layui-form-item"><label class="layui-form-label">配置</label><div class="layui-input-block"><textarea id="f_config" class="layui-textarea" placeholder="JSON"></textarea></div></div>'
+      +'</div>';
+    layer.open({type:1,title:'新增爬虫',area:['520px','480px'],content:html,btn:['保存','取消'],yes:function(){
+      var fd = new FormData();
+      fd.append('name', document.getElementById('f_name').value.trim());
+      fd.append('module', document.getElementById('f_module').value.trim());
+      fd.append('callable', document.getElementById('f_callable').value.trim());
+      fd.append('config', document.getElementById('f_config').value.trim());
+      fd.append('enabled', '1');
+      fetch('/admin/crawlers/add', {method:'POST', body: fd})
+        .then(function(r){return r.json();})
+        .then(function(res){ if (res.code===0){ layer.msg('已添加'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
+    }});
+  });
+  document.querySelector('table').addEventListener('click', function(e){
+    var t = e.target;
+    if (!t || !t.dataset) return;
+    var tr = t.closest('tr');
+    var id = tr && tr.getAttribute('data-id');
+    if (!id) return;
+    if (t.dataset.action === 'edit'){
+      var name = tr.children[1].textContent.trim();
+      var module = tr.children[2].textContent.trim();
+      var callable = tr.children[3].textContent.trim();
+      var config = tr.children[4].textContent.trim();
+      var html = '<div style="padding:12px">'
+        +'<div class="layui-form-item"><label class="layui-form-label">名称</label><div class="layui-input-block"><input id="f_name" value="'+name+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">模块</label><div class="layui-input-block"><input id="f_module" value="'+module+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">函数</label><div class="layui-input-block"><input id="f_callable" value="'+callable+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">配置</label><div class="layui-input-block"><textarea id="f_config" class="layui-textarea">'+config+'</textarea></div></div>'
+        +'</div>';
+      layer.open({type:1,title:'编辑爬虫',area:['520px','480px'],content:html,btn:['保存','取消'],yes:function(){
+        var fd = new FormData();
+        fd.append('name', document.getElementById('f_name').value.trim());
+        fd.append('module', document.getElementById('f_module').value.trim());
+        fd.append('callable', document.getElementById('f_callable').value.trim());
+        fd.append('config', document.getElementById('f_config').value.trim());
+        fd.append('enabled', '1');
+        fetch('/admin/crawlers/update/'+id, {method:'POST', body: fd})
+          .then(function(r){return r.json();})
+          .then(function(res){ if (res.code===0){ layer.msg('已更新'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
+      }});
+    }
+    if (t.dataset.action === 'del'){
+      layer.confirm('确认删除该爬虫？',{icon:3}, function(){
+        fetch('/admin/crawlers/delete/'+id, {method:'POST'})
+          .then(function(r){return r.json();})
+          .then(function(res){ if (res.code===0){ layer.msg('已删除'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
+      });
+    }
+  });
+});
+</script>
+{% endblock %}

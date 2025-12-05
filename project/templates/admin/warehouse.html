@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}数据仓库管理 - {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="layui-card">
+  <div class="layui-card-header">数据仓库管理</div>
+  <div class="layui-card-body">
+    <div class="layui-form" style="margin-bottom:10px">
+      <div class="layui-inline">
+        <input type="text" id="q" value="{{ q }}" placeholder="关键词/标题/摘要" class="layui-input" style="width:260px">
+      </div>
+      <div class="layui-inline">
+        <button class="layui-btn" id="btnSearch">查询</button>
+        <button class="layui-btn layui-btn-normal" id="btnRefresh">刷新</button>
+      </div>
+    </div>
+    <table class="layui-table">
+      <thead>
+        <tr>
+          <th>序号</th>
+          <th>封面</th>
+          <th>标题</th>
+          <th>来源</th>
+          <th>关键词</th>
+          <th>链接</th>
+          <th>创建时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-id="{{ r.id }}">
+          <td>{{ loop.index }}</td>
+          <td><img src="{{ r.cover or url_for('static', filename='images/zanwu.jpg') }}" style="width:80px;height:60px;object-fit:cover" onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/zanwu.jpg') }}'"></td>
+          <td>{{ r.title }}</td>
+          <td>{{ r.source }}</td>
+          <td>{{ r.keyword }}</td>
+          <td><a href="{{ r.url }}" target="_blank">打开</a></td>
+          <td>{{ r.created_at }}</td>
+          <td>
+            <div class="op-actions">
+              <button class="layui-btn layui-btn-sm" data-action="edit"><i class="layui-icon layui-icon-edit"></i>编辑</button>
+              <button class="layui-btn layui-btn-sm layui-btn-danger" data-action="del"><i class="layui-icon layui-icon-delete"></i>删除</button>
+              <button class="layui-btn layui-btn-sm layui-btn-primary" data-action="detail"><i class="layui-icon layui-icon-survey"></i>详细</button>
+              <button class="layui-btn layui-btn-sm layui-btn-warm" data-action="analyze"><i class="layui-icon layui-icon-chart-screen"></i>AI解析</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+layui.use(['layer','form'], function(){
+  var layer = layui.layer;
+  document.getElementById('btnSearch').addEventListener('click', function(){
+    var q = document.getElementById('q').value.trim();
+    location.href = '/admin/warehouse?q=' + encodeURIComponent(q);
+  });
+  document.getElementById('btnRefresh').addEventListener('click', function(){ location.href = '/admin/warehouse'; });
+  document.querySelector('table').addEventListener('click', function(e){
+    var t = e.target.closest('button');
+    if (!t) return;
+    var tr = t.closest('tr');
+    if (!tr) return;
+    var id = tr.getAttribute('data-id');
+    if (t.dataset.action === 'edit') {
+      var title = tr.children[2].textContent.trim();
+      var source = tr.children[3].textContent.trim();
+      var keyword = tr.children[4].textContent.trim();
+      var url = tr.children[5].querySelector('a').getAttribute('href');
+      var cover = tr.children[1].querySelector('img').getAttribute('src');
+      var html = '<div style="padding:10px">'
+        +'<div class="layui-form-item"><label class="layui-form-label">标题</label><div class="layui-input-block"><input id="f_title" value="'+(title||'')+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">摘要</label><div class="layui-input-block"><textarea id="f_summary" class="layui-textarea"></textarea></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">封面</label><div class="layui-input-block"><input id="f_cover" value="'+(cover||'')+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">链接</label><div class="layui-input-block"><input id="f_url" value="'+(url||'')+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">来源</label><div class="layui-input-block"><input id="f_source" value="'+(source||'')+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">关键词</label><div class="layui-input-block"><input id="f_keyword" value="'+(keyword||'')+'" class="layui-input"></div></div>'
+      +'</div>';
+      layer.open({type:1,title:'编辑',area:['600px','520px'],content:html,btn:['保存','取消'],yes:function(){
+        var fd = new FormData();
+        fd.append('title', document.getElementById('f_title').value);
+        fd.append('summary', document.getElementById('f_summary').value);
+        fd.append('cover', document.getElementById('f_cover').value);
+        fd.append('url', document.getElementById('f_url').value);
+        fd.append('source', document.getElementById('f_source').value);
+        fd.append('keyword', document.getElementById('f_keyword').value);
+        fetch('/admin/warehouse/update/'+id, {method:'POST', body: fd})
+          .then(function(r){return r.json();})
+          .then(function(res){ if (res.code===0){ layer.msg('已保存'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
+      }});
+    }
+    if (t.dataset.action === 'del') {
+      layer.confirm('确认删除该条数据及其详细？',{icon:3}, function(){
+        fetch('/admin/warehouse/delete/'+id, {method:'POST'})
+          .then(function(r){return r.json();})
+          .then(function(res){ if (res.code===0){ layer.msg('已删除'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
+      });
+    }
+    if (t.dataset.action === 'detail') {
+      fetch('/admin/warehouse/detail/'+id)
+        .then(function(r){return r.json();})
+        .then(function(res){ var d=res.detail||{}; var txt=d.content_text||''; var html=d.content_html||''; layer.open({type:1,title:'详细内容',area:['800px','600px'],content:'<div style="padding:10px"><div style="margin-bottom:8px;color:#666">正文（文本）</div><div style="max-height:200px;overflow:auto;white-space:pre-wrap">'+txt+'</div><div style="margin-top:12px;color:#666">原文（HTML）</div><div style="max-height:260px;overflow:auto;">'+html+'</div></div>'}); });
+    }
+    if (t.dataset.action === 'analyze') {
+      fetch('/admin/warehouse/analyze/'+id, {method:'POST'})
+        .then(function(r){return r.json();})
+        .then(function(res){ layer.msg(res.msg||'未实现'); });
+    }
+  });
+});
+</script>
+{% endblock %}
