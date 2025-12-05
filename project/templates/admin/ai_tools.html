@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}AI数据清洗分析{% endblock %}
+{% block content %}
+<div class="layui-row layui-col-space15">
+  <div class="layui-col-md12">
+    <div class="layui-card">
+      <div class="layui-card-header">AI数据清洗与分析</div>
+      <div class="layui-card-body">
+        <div class="chat-wrap">
+          <div id="chatList" class="chat-list"></div>
+          <div class="chat-tools">
+            <button id="btnClearChat" class="layui-btn layui-btn-primary">清空</button>
+            <button id="btnCopy" class="layui-btn">复制</button>
+            <button id="btnExport" class="layui-btn">导出MD</button>
+          </div>
+        </div>
+        <div class="chat-inputbar">
+          <textarea id="prompt" class="prompt-input" placeholder="输入与 AI 对话内容，Enter 发送，Shift+Enter 换行"></textarea>
+          <button id="btnSend" class="layui-btn send-btn">发送</button>
+          <button id="btnStop" class="layui-btn layui-btn-danger send-btn">停止</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+layui.use(['layer'], function(){
+  var layer = layui.layer;
+  var currentES = null;
+  var lastTyping = null;
+  function pushUserMsg(text){
+    var list = document.getElementById('chatList');
+    var item = document.createElement('div'); item.className='chat-msg user';
+    item.innerHTML = '<div class="role-ava">我</div><div class="msg-body">'+(text?text.replace(/[<>]/g,function(ch){return ({'<':'&lt;','>':'&gt;'}[ch])}) :'')+'</div>';
+    list.appendChild(item); try{ item.scrollIntoView({behavior:'smooth',block:'end'}); }catch(e){}
+  }
+  function pushAiMsg(){
+    var list = document.getElementById('chatList');
+    var item = document.createElement('div'); item.className='chat-msg ai';
+    var body = document.createElement('div'); body.className='msg-body';
+    var typing = document.createElement('div'); typing.className='typing'; typing.innerHTML='<span></span><span></span><span></span>';
+    item.innerHTML = '<div class="role-ava">AI</div>';
+    item.appendChild(body); item.appendChild(typing);
+    list.appendChild(item);
+    lastTyping = typing;
+    return {item:item, body:body, typing:typing};
+  }
+  function lastAiBody(){ var list=document.getElementById('chatList'); var nodes=list.querySelectorAll('.chat-msg.ai .msg-body'); return nodes.length? nodes[nodes.length-1] : null; }
+  function sendPrompt(){
+    var prompt = document.getElementById('prompt').value.trim();
+    if (!prompt){ layer.msg('请输入内容'); return; }
+    pushUserMsg(prompt);
+    var ai = pushAiMsg();
+    var url = '/admin/ai_analyze_stream?prompt=' + encodeURIComponent(prompt);
+    try {
+      currentES = streamSSEToMarkdown(ai.body, url);
+      currentES.onerror = function(){
+        try { currentES.close(); } catch(e){}
+        var fd = new FormData(); fd.append('prompt', prompt);
+        fetch('/admin/ai_analyze_demo', {method:'POST', body: fd})
+          .then(function(r){ return r.json(); })
+          .then(function(res){ ai.typing.remove(); if(res.code===0){ ai.body.innerHTML = mdToHtml(res.reply||''); } else { ai.body.textContent = res.msg||'失败'; } })
+          .catch(function(){ ai.typing.remove(); ai.body.textContent = '网络错误'; });
+      };
+    } catch(e) { ai.typing.remove(); ai.body.textContent = '启动流式输出失败'; }
+  }
+  document.getElementById('btnSend').addEventListener('click', sendPrompt);
+  document.getElementById('prompt').addEventListener('keydown', function(ev){
+    if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); sendPrompt(); }
+  });
+  document.getElementById('btnStop').addEventListener('click', function(){ try{ currentES && currentES.close(); }catch(e){} try{ lastTyping && lastTyping.remove(); }catch(e){} });
+  document.getElementById('btnClearChat').addEventListener('click', function(){ var list=document.getElementById('chatList'); list.innerHTML=''; });
+  document.getElementById('btnCopy').addEventListener('click', function(){ var b=lastAiBody(); if(!b){ layer.msg('无可复制内容'); return; } var txt=b.innerText||''; try{ navigator.clipboard.writeText(txt); layer.msg('已复制'); }catch(e){ layer.msg('复制失败'); } });
+  document.getElementById('btnExport').addEventListener('click', function(){ var b=lastAiBody(); if(!b){ layer.msg('无可导出内容'); return; } var md=b.dataset.md || ''; if(!md){ md=b.innerText||''; } var blob=new Blob([md],{type:'text/markdown;charset=utf-8'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ai_analyze.md'; a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); },500); });
+});
+</script>
+<style>
+.result-table{ table-layout: fixed; }
+.result-table th, .result-table td{ word-break: break-all; }
+.result-table .cell-clip{ max-height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }
+.sql-box{ display:none }
+.reply-box{ display:none }
+</style>
+{% endblock %}

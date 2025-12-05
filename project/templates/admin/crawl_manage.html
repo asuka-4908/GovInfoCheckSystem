@@ -15,6 +15,10 @@
             #crawlbar .layui-select-title .layui-edge{top:50%;transform:translateY(-50%)}
             #crawlbar .layui-btn{height:36px;line-height:36px;padding:0 16px}
             #resultsWrap{max-height:calc(100vh - 260px);overflow:auto}
+            #results{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:15px}
+            .result-card .layui-card-body img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px}
+            .result-card .title{margin-top:8px;font-weight:600;line-height:1.4}
+            .result-card .card-actions{margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
           </style>
           <div id="crawlbar" class="layui-form-item" style="display:flex;align-items:center;gap:16px;flex-wrap:nowrap">
             <div class="layui-inline" style="width:280px">
@@ -23,12 +27,10 @@
                 <input type="text" id="kw" placeholder="请输入采集关键词或需求" autocomplete="off" class="layui-input">
               </div>
             </div>
-            <div class="layui-inline" style="width:180px">
+            <div class="layui-inline" style="width:240px">
               <label class="layui-form-label" style="width:auto;padding-right:8px">来源</label>
               <div class="layui-input-block" style="margin-left:0">
                 <select id="source" class="layui-input">
-                  <option value="baidu">百度新闻</option>
-                  <option value="xinhua">新华社(四川要闻)</option>
                   {% for c in crawlers %}
                   <option value="{{ c.name }}">{{ c.name }}</option>
                   {% endfor %}
@@ -44,6 +46,7 @@
             <div class="layui-inline" style="width:auto;display:flex;gap:8px">
               <button class="layui-btn" id="btnFetch"><i class="layui-icon layui-icon-search"></i> 开始采集</button>
               <button class="layui-btn layui-btn-normal" id="btnSaveSelected" disabled><i class="layui-icon layui-icon-form"></i> 批量入库<span id="selCount" style="margin-left:6px;color:#999;display:none">(0)</span></button>
+              <button class="layui-btn layui-btn-warm" id="btnSelectAll"><i class="layui-icon layui-icon-ok"></i> 全选</button>
             </div>
           </div>
         </div>
@@ -58,7 +61,7 @@
     <div class="layui-card">
       <div class="layui-card-header">采集结果</div>
       <div class="layui-card-body" id="resultsWrap">
-        <div id="results" class="layui-row layui-col-space15"></div>
+        <div id="results"></div>
       </div>
     </div>
   </div>
@@ -119,7 +122,7 @@
       cont.innerHTML = '';
       items.forEach(function (it, idx) {
         var col = document.createElement('div');
-        col.className = 'layui-col-lg4 layui-col-md6 layui-col-sm12';
+        col.className = 'result-card';
         var card = document.createElement('div');
         card.className = 'layui-card';
         var body = document.createElement('div');
@@ -129,19 +132,19 @@
         var coverBlock = '';
         var defaultImg = '/static/images/zanwu.jpg';
         if (cover && url) {
-          coverBlock = '<a href="' + url + '" target="_blank"><img src="' + cover + '" onerror="this.onerror=null;this.src=\'' + defaultImg + '\'" style="width:100%;height:160px;object-fit:cover;border-radius:6px"/></a>';
+          coverBlock = '<a href="' + url + '" target="_blank"><img src="' + cover + '" onerror="this.onerror=null;this.src=\'' + defaultImg + '\'"/></a>';
         } else if (cover) {
-          coverBlock = '<img src="' + cover + '" onerror="this.onerror=null;this.src=\'' + defaultImg + '\'" style="width:100%;height:160px;object-fit:cover;border-radius:6px"/>';
+          coverBlock = '<img src="' + cover + '" onerror="this.onerror=null;this.src=\'' + defaultImg + '\'"/>';
         } else if (url) {
-          coverBlock = '<a href="' + url + '" target="_blank"><img src="' + defaultImg + '" style="width:100%;height:160px;object-fit:contain;border-radius:6px;background:#f5f7fa"/></a>';
+          coverBlock = '<a href="' + url + '" target="_blank"><img src="' + defaultImg + '" style="object-fit:contain;background:#f5f7fa"/></a>';
         } else {
-          coverBlock = '<img src="' + defaultImg + '" style="width:100%;height:160px;object-fit:contain;border-radius:6px;background:#f5f7fa"/>';
+          coverBlock = '<img src="' + defaultImg + '" style="object-fit:contain;background:#f5f7fa"/>';
         }
         var title = it['标题'] || '';
         var source = it['来源'] || '';
         var status = it.deep_done ? '<span class="status-badge status-ok">已</span>' : '<span class="status-badge status-no">未</span>';
         var checkbox = '<input type="checkbox" class="sel-item" data-index="' + idx + '" style="margin-right:8px">';
-        body.innerHTML = coverBlock + '<div style="margin-top:8px;font-weight:600;line-height:1.4;min-height:40px"><a href="' + url + '" target="_blank">' + title + '</a></div>' + '<div style="color:#999;margin-top:4px">' + source + '</div>' + '<div class="card-actions" style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">' + status + '<button class="layui-btn layui-btn-sm" data-action="deep" data-index="' + idx + '"><i class="layui-icon layui-icon-search"></i>深度采集</button><button class="layui-btn layui-btn-sm layui-btn-normal" data-action="saveOne" data-index="' + idx + '"><i class="layui-icon layui-icon-form"></i>单条入库</button>' + checkbox + '</div>';
+        body.innerHTML = coverBlock + '<div class="title"><a href="' + url + '" target="_blank">' + title + '</a></div>' + '<div style="color:#999;margin-top:4px">' + source + '</div>' + '<div class="card-actions">' + status + '<button class="layui-btn layui-btn-sm" data-action="deep" data-index="' + idx + '"><i class="layui-icon layui-icon-search"></i>深度采集</button><button class="layui-btn layui-btn-sm layui-btn-normal" data-action="saveOne" data-index="' + idx + '"><i class="layui-icon layui-icon-form"></i>单条入库</button>' + checkbox + '</div>';
         card.appendChild(body);
         col.appendChild(card);
         cont.appendChild(col);
@@ -184,8 +187,8 @@
       items = []; renderItems(); setProgress(5);
       var cur = 10;
       var timer = setInterval(function () { cur = Math.min(cur + 5, 85); setProgress(cur); }, 300);
-      var endpoint = source === 'xinhua' ? '/api/crawl_xinhua' : (source === 'baidu' ? '/api/crawl' : '/api/crawl_dynamic');
-      var q = endpoint + '?keyword=' + encodeURIComponent(kw) + '&count=' + count + (endpoint === '/api/crawl_dynamic' ? ('&source=' + encodeURIComponent(source)) : '');
+      var endpoint = '/api/crawl_dynamic';
+      var q = endpoint + '?keyword=' + encodeURIComponent(kw) + '&count=' + count + '&source=' + encodeURIComponent(source);
       fetch(q)
         .then(function (r) { setProgress(65); return r.json(); })
         .then(function (data) {
@@ -262,7 +265,7 @@
         var kw = document.getElementById('kw').value.trim();
         fetch('/api/save_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keyword: kw, items: [it2] }) })
           .then(function (r) { return r.json(); })
-          .then(function (res) { if (res.code === 0) { layer.msg('已入库:' + res.ids.join(',')); } else { layer.msg('失败:' + res.msg); } })
+          .then(function (res) { if (res.code === 0) { layer.msg('已入库！'); } else if (res.code === 2) { layer.msg('重复入库'); } else { layer.msg('失败:' + res.msg); } })
           .catch(function () { layer.msg('网络错误'); });
       }
       if (t.dataset && t.dataset.action === 'toggleSummary') {
@@ -298,9 +301,17 @@
       if (payload.length === 0) { layer.msg('请选择数据'); return; }
       fetch('/api/save_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keyword: kw, items: payload }) })
         .then(function (r) { return r.json(); })
-        .then(function (res) { if (res.code === 0) { layer.msg('批量入库完成'); } else { layer.msg('失败:' + res.msg); } })
+        .then(function (res) { if (res.code === 0) { layer.msg('批量入库完成'); } else if (res.code === 2) { layer.msg('重复入库'); } else { layer.msg('失败:' + res.msg); } })
         .catch(function () { layer.msg('网络错误'); });
       updateSelectionUI();
+    });
+
+    document.getElementById('btnSelectAll').addEventListener('click', function(){
+      var checks = Array.prototype.slice.call(document.querySelectorAll('.sel-item'));
+      var allSelected = checks.length > 0 && checks.every(function(c){ return c.checked; });
+      checks.forEach(function(c){ c.checked = !allSelected; });
+      updateSelectionUI();
+      layer.msg(allSelected ? '已取消全选' : '已全选当页');
     });
 
     document.getElementById('kw').addEventListener('input', saveState);

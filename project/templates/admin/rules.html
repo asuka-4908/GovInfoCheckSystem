@@ -16,14 +16,24 @@
         <button class="layui-btn layui-btn-primary" id="btnRefresh">刷新</button>
       </div>
     </div>
-    <table class="layui-table">
+    <div class="table-wrap">
+    <table class="layui-table rule-table">
+      <colgroup>
+        <col style="width:70px">
+        <col style="width:180px">
+        <col style="width:220px">
+        <col style="width:220px">
+        <col style="width:320px">
+        <col style="width:90px">
+        <col style="width:140px">
+      </colgroup>
       <thead>
         <tr>
           <th>序号</th>
           <th>站点</th>
           <th>标题XPath</th>
           <th>内容XPath</th>
-          <th>Request Headers(JSON)</th>
+          <th class="col-req">Request Headers(JSON)</th>
           <th>启用</th>
           <th>操作</th>
         </tr>
@@ -33,21 +43,31 @@
         <tr data-id="{{ r.id }}">
           <td>{{ loop.index }}</td>
           <td>{{ r.site }}</td>
-          <td style="max-width:260px;word-break:break-all">{{ r.title_xpath }}</td>
-          <td style="max-width:260px;word-break:break-all">{{ r.content_xpath }}</td>
-          <td style="max-width:300px;word-break:break-all">{{ r.request_headers }}</td>
+          <td><div class="cell-clip">{{ r.title_xpath }}</div></td>
+          <td><div class="cell-clip">{{ r.content_xpath }}</div></td>
+          <td class="col-req"><div class="cell-clip">{{ r.request_headers }}</div></td>
           <td>{{ '是' if r.enabled == 1 else '否' }}</td>
           <td>
             <div class="op-actions">
               <button class="layui-btn layui-btn-sm" data-action="edit"><i class="layui-icon layui-icon-edit"></i>编辑</button>
               <button class="layui-btn layui-btn-sm layui-btn-danger" data-action="del"><i class="layui-icon layui-icon-delete"></i>删除</button>
+              <button class="layui-btn layui-btn-sm layui-btn-primary" data-action="view-headers">查看Headers</button>
             </div>
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
+  <style>
+    .table-wrap{overflow:auto}
+    .rule-table { table-layout: fixed; width:100%; }
+    .rule-table th, .rule-table td { word-break: break-all; }
+    .rule-table thead th{position:sticky;top:0;background:#fff;z-index:1}
+    .rule-table .cell-clip { max-height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    @media (max-width: 1260px){ .rule-table th.col-req, .rule-table td.col-req{ display:none; } }
+  </style>
 {% endblock %}
 
 {% block scripts %}
@@ -117,8 +137,12 @@ layui.use(['layer','form'], function(){
           .then(function(res){ if (res.code===0){ layer.msg('已删除'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
       });
     }
+    if (t.dataset.action === 'view-headers') {
+      var headers = tr.children[4] && tr.children[4].textContent;
+      var html = '<div style="padding:12px;max-height:420px;overflow:auto;white-space:pre-wrap">' + (headers||'') + '</div>';
+      layer.open({ type:1, title:'Request Headers(JSON)', area:['720px','520px'], shadeClose:true, content: html });
+    }
   });
 });
 </script>
 {% endblock %}
-

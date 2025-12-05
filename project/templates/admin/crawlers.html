@@ -6,107 +6,276 @@
 <div class="layui-row layui-col-space15">
   <div class="layui-col-md12">
     <div class="layui-card">
+      <div class="layui-card-header">智能分析并添加规则</div>
+      <div class="layui-card-body">
+        <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+          <input id="auto_url" class="layui-input" placeholder="源始地址URL，例如：https://news.xxx.com/article/123"
+            style="min-width:380px">
+          <textarea id="auto_headers" class="layui-textarea" placeholder="请求头（JSON或逐行 key:value）"
+            style="min-width:380px;height:100px"></textarea>
+          <button class="layui-btn" id="btnAuto">智能分析并入库</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="layui-col-md12">
+    <div class="layui-card">
       <div class="layui-card-header">爬虫列表</div>
       <div class="layui-card-body">
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-          <input id="q" class="layui-input" placeholder="按名称/模块/函数搜索" style="max-width:300px">
+          <input id="q" class="layui-input" placeholder="按名称/域名/配置搜索" style="max-width:300px">
           <button class="layui-btn" id="btnSearch">查询</button>
           <button class="layui-btn layui-btn-primary" id="btnRefresh">刷新</button>
           <button class="layui-btn layui-btn-normal" id="btnAdd">新增</button>
         </div>
-        <table class="layui-table">
-          <thead>
-            <tr><th>ID</th><th>名称</th><th>模块</th><th>函数</th><th>配置</th><th>启用</th><th>操作</th></tr>
-          </thead>
-          <tbody>
-            {% for r in rows %}
-            <tr data-id="{{ r.id }}">
-              <td>{{ r.id }}</td>
-              <td>{{ r.name }}</td>
-              <td>{{ r.module }}</td>
-              <td>{{ r.callable }}</td>
-              <td style="max-width:320px;word-break:break-all">{{ r.config }}</td>
-              <td>{{ '是' if r.enabled == 1 else '否' }}</td>
-              <td>
-                <div class="op-actions">
-                  <button class="layui-btn layui-btn-sm" data-action="edit">编辑</button>
-                  <button class="layui-btn layui-btn-sm layui-btn-danger" data-action="del">删除</button>
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        <div class="table-wrap">
+          <table class="layui-table crawler-table">
+            <colgroup>
+              <col style="width:70px">
+              <col style="width:160px">
+              <col style="width:220px">
+              <col style="width:320px">
+              <col style="width:90px">
+              <col style="width:140px">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>序号</th>
+                <th>名称</th>
+                <th>域名</th>
+                <th class="col-config">配置</th>
+                <th>启用</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+              <tr data-id="{{ r.id }}">
+                <td>{{ loop.index }}</td>
+                <td>{{ r.name }}</td>
+                <td>
+                  <div class="cell-clip">{{ r.domain }}</div>
+                </td>
+                <td class="col-config">
+                  <div class="cell-clip-2">{{ r.config }}</div>
+                </td>
+                <td>{{ '是' if r.enabled == 1 else '否' }}</td>
+                <td>
+                  <div class="op-actions">
+                    <button class="layui-btn layui-btn-sm" data-action="edit">编辑</button>
+                    <button class="layui-btn layui-btn-sm layui-btn-danger" data-action="del">删除</button>
+                    <button class="layui-btn layui-btn-sm layui-btn-primary" data-action="view-config">查看配置</button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
-{% endblock %}
+  <style>
+    .table-wrap {
+      overflow: auto
+    }
 
-{% block scripts %}
-<script>
-layui.use(['layer','form'], function(){
-  var layer = layui.layer;
-  document.getElementById('btnSearch').addEventListener('click', function(){
-    var q = document.getElementById('q').value.trim();
-    location.href = '/admin/crawlers?q=' + encodeURIComponent(q);
-  });
-  document.getElementById('btnRefresh').addEventListener('click', function(){ location.href = '/admin/crawlers'; });
-  document.getElementById('btnAdd').addEventListener('click', function(){
-    var html = '<div style="padding:12px">'
-      +'<div class="layui-form-item"><label class="layui-form-label">名称</label><div class="layui-input-block"><input id="f_name" class="layui-input" placeholder="例如: baidu"></div></div>'
-      +'<div class="layui-form-item"><label class="layui-form-label">模块</label><div class="layui-input-block"><input id="f_module" class="layui-input" placeholder="app.crawlers.baidu"></div></div>'
-      +'<div class="layui-form-item"><label class="layui-form-label">函数</label><div class="layui-input-block"><input id="f_callable" class="layui-input" placeholder="run"></div></div>'
-      +'<div class="layui-form-item"><label class="layui-form-label">配置</label><div class="layui-input-block"><textarea id="f_config" class="layui-textarea" placeholder="JSON"></textarea></div></div>'
-      +'</div>';
-    layer.open({type:1,title:'新增爬虫',area:['520px','480px'],content:html,btn:['保存','取消'],yes:function(){
-      var fd = new FormData();
-      fd.append('name', document.getElementById('f_name').value.trim());
-      fd.append('module', document.getElementById('f_module').value.trim());
-      fd.append('callable', document.getElementById('f_callable').value.trim());
-      fd.append('config', document.getElementById('f_config').value.trim());
-      fd.append('enabled', '1');
-      fetch('/admin/crawlers/add', {method:'POST', body: fd})
-        .then(function(r){return r.json();})
-        .then(function(res){ if (res.code===0){ layer.msg('已添加'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
-    }});
-  });
-  document.querySelector('table').addEventListener('click', function(e){
-    var t = e.target;
-    if (!t || !t.dataset) return;
-    var tr = t.closest('tr');
-    var id = tr && tr.getAttribute('data-id');
-    if (!id) return;
-    if (t.dataset.action === 'edit'){
-      var name = tr.children[1].textContent.trim();
-      var module = tr.children[2].textContent.trim();
-      var callable = tr.children[3].textContent.trim();
-      var config = tr.children[4].textContent.trim();
-      var html = '<div style="padding:12px">'
-        +'<div class="layui-form-item"><label class="layui-form-label">名称</label><div class="layui-input-block"><input id="f_name" value="'+name+'" class="layui-input"></div></div>'
-        +'<div class="layui-form-item"><label class="layui-form-label">模块</label><div class="layui-input-block"><input id="f_module" value="'+module+'" class="layui-input"></div></div>'
-        +'<div class="layui-form-item"><label class="layui-form-label">函数</label><div class="layui-input-block"><input id="f_callable" value="'+callable+'" class="layui-input"></div></div>'
-        +'<div class="layui-form-item"><label class="layui-form-label">配置</label><div class="layui-input-block"><textarea id="f_config" class="layui-textarea">'+config+'</textarea></div></div>'
-        +'</div>';
-      layer.open({type:1,title:'编辑爬虫',area:['520px','480px'],content:html,btn:['保存','取消'],yes:function(){
+    .table-wrap .crawler-table {
+      min-width: 900px
+    }
+
+    .crawler-table {
+      table-layout: fixed;
+      width: 100%;
+    }
+
+    .crawler-table th,
+    .crawler-table td {
+      word-break: break-all;
+    }
+
+    .crawler-table thead th {
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 1
+    }
+
+    @media (max-width: 1260px) {
+
+      .crawler-table th.col-config,
+      .crawler-table td.col-config {
+        display: none;
+      }
+    }
+
+    .crawler-table .cell-clip {
+      max-height: 24px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .crawler-table .cell-clip-2 {
+      max-height: 40px;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+  </style>
+  {% endblock %}
+
+  {% block scripts %}
+  <script>
+    layui.use(['layer', 'form'], function () {
+      var layer = layui.layer;
+      document.getElementById('btnAuto').addEventListener('click', function () {
+        var url = document.getElementById('auto_url').value.trim();
+        var hdr = document.getElementById('auto_headers').value.trim();
+        if (!url) { layer.msg('请输入源始地址URL'); return; }
         var fd = new FormData();
-        fd.append('name', document.getElementById('f_name').value.trim());
-        fd.append('module', document.getElementById('f_module').value.trim());
-        fd.append('callable', document.getElementById('f_callable').value.trim());
-        fd.append('config', document.getElementById('f_config').value.trim());
-        fd.append('enabled', '1');
-        fetch('/admin/crawlers/update/'+id, {method:'POST', body: fd})
-          .then(function(r){return r.json();})
-          .then(function(res){ if (res.code===0){ layer.msg('已更新'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
-      }});
-    }
-    if (t.dataset.action === 'del'){
-      layer.confirm('确认删除该爬虫？',{icon:3}, function(){
-        fetch('/admin/crawlers/delete/'+id, {method:'POST'})
-          .then(function(r){return r.json();})
-          .then(function(res){ if (res.code===0){ layer.msg('已删除'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
+        fd.append('test_url', url);
+        fd.append('request_headers', hdr);
+        fetch('/admin/crawlers/auto_rule', { method: 'POST', body: fd })
+          .then(function (r) { return r.json(); })
+          .then(function (res) { if (res.code === 0) { layer.msg('爬虫已更新'); setTimeout(function () { location.reload(); }, 500); } else { layer.msg(res.msg || '失败'); } });
       });
-    }
-  });
-});
-</script>
-{% endblock %}
+      document.getElementById('btnSearch').addEventListener('click', function () {
+        var q = document.getElementById('q').value.trim();
+        location.href = '/admin/crawlers?q=' + encodeURIComponent(q);
+      });
+      document.getElementById('btnRefresh').addEventListener('click', function () { location.href = '/admin/crawlers'; });
+      document.getElementById('btnAdd').addEventListener('click', function () {
+        var html = '<div style="padding:12px">'
+          + '<div class="layui-form-item"><label class="layui-form-label">解析URL</label><div class="layui-input-block"><input id="f_url" class="layui-input" placeholder="例如: https://www.baidu.com/s?..."></div></div>'
+          + '<div class="layui-form-item"><label class="layui-form-label">名称</label><div class="layui-input-block"><input id="f_name" class="layui-input" placeholder="例如: baidu/百度"></div></div>'
+          + '<div class="layui-form-item"><label class="layui-form-label">域名</label><div class="layui-input-block"><input id="f_domain" class="layui-input" placeholder="例如: www.baidu.com"></div></div>'
+          + '<div class="layui-form-item"><label class="layui-form-label">配置</label><div class="layui-input-block"><textarea id="f_config" class="layui-textarea" placeholder="JSON"></textarea></div></div>'
+          + '</div>';
+        layer.open({
+          type: 1, title: '新增爬虫', area: ['520px', '520px'], content: html, btn: ['保存', '取消'], success: function () {
+            var parseBtn = document.createElement('button');
+            parseBtn.className = 'layui-btn layui-btn-primary';
+            parseBtn.textContent = '智能解析';
+            parseBtn.style.margin = '8px 0 0 110px';
+            var box = document.querySelector('.layui-layer-content');
+            if (box) { box.appendChild(parseBtn); }
+            parseBtn.addEventListener('click', function () {
+              try {
+                var u = document.getElementById('f_url').value.trim();
+                if (!u) { layer.msg('请输入URL'); return; }
+                var _u = new URL(u);
+                var host = (_u.hostname || '').toLowerCase();
+                var parts = host.split('.');
+                var token = parts.length >= 2 ? parts[parts.length - 2] : host;
+                if (token === 'www' && parts.length >= 3) token = parts[parts.length - 3];
+                document.getElementById('f_domain').value = host;
+                document.getElementById('f_name').value = token;
+                layer.msg('已解析');
+              } catch (e) { layer.msg('URL无效'); }
+            });
+          }, yes: function () {
+            var fd = new FormData();
+            fd.append('name', document.getElementById('f_name').value.trim());
+            fd.append('config', document.getElementById('f_config').value.trim());
+            fd.append('domain', document.getElementById('f_domain').value.trim());
+            fd.append('enabled', '1');
+            fetch('/admin/crawlers/add', { method: 'POST', body: fd })
+              .then(function (r) { return r.json(); })
+              .then(function (res) { if (res.code === 0) { layer.msg('已添加'); setTimeout(function () { location.reload(); }, 500); } else { layer.msg(res.msg || '失败'); } });
+          }
+        });
+      });
+      document.querySelector('table').addEventListener('click', function (e) {
+        var t = e.target;
+        if (!t || !t.dataset) return;
+        var tr = t.closest('tr');
+        var id = tr && tr.getAttribute('data-id');
+        if (!id) return;
+        if (t.dataset.action === 'edit') {
+          var name = tr.children[1].textContent.trim();
+          var domain = tr.children[2].textContent.trim();
+          var config = tr.children[3].textContent.trim();
+          var html = '<div style="padding:12px">'
+            + '<div class="layui-form-item"><label class="layui-form-label">名称</label><div class="layui-input-block"><input id="f_name" value="' + name + '" class="layui-input"></div></div>'
+            + '<div class="layui-form-item"><label class="layui-form-label">域名</label><div class="layui-input-block"><input id="f_domain" value="' + domain + '" class="layui-input"></div></div>'
+            + '<div class="layui-form-item"><label class="layui-form-label">配置</label><div class="layui-input-block"><textarea id="f_config" class="layui-textarea">' + config + '</textarea></div></div>'
+            + '</div>';
+          layer.open({
+            type: 1, title: '编辑爬虫', area: ['520px', '520px'], content: html, btn: ['保存', '取消'], success: function () {
+              var parseBtn = document.createElement('button');
+              parseBtn.className = 'layui-btn layui-btn-primary';
+              parseBtn.textContent = '智能解析';
+              parseBtn.style.margin = '8px 0 0 110px';
+              var box = document.querySelector('.layui-layer-content');
+              if (box) { box.appendChild(parseBtn); }
+              parseBtn.addEventListener('click', function () {
+                layer.prompt({ title: '输入URL进行解析', formType: 0 }, function (val, idx) {
+                  layer.close(idx);
+                  try {
+                    var u = val.trim();
+                    if (!u) { layer.msg('请输入URL'); return; }
+                    var _u = new URL(u);
+                    var host = (_u.hostname || '').toLowerCase();
+                    var parts = host.split('.');
+                    var token = parts.length >= 2 ? parts[parts.length - 2] : host;
+                    if (token === 'www' && parts.length >= 3) token = parts[parts.length - 3];
+                    document.getElementById('f_domain').value = host;
+                    document.getElementById('f_name').value = token;
+                    layer.msg('已解析');
+                  } catch (e) { layer.msg('URL无效'); }
+                });
+              });
+            }, yes: function () {
+              var fd = new FormData();
+              fd.append('name', document.getElementById('f_name').value.trim());
+              fd.append('config', document.getElementById('f_config').value.trim());
+              fd.append('domain', document.getElementById('f_domain').value.trim());
+              fd.append('enabled', '1');
+              fetch('/admin/crawlers/update/' + id, { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (res) { if (res.code === 0) { layer.msg('已更新'); setTimeout(function () { location.reload(); }, 500); } else { layer.msg(res.msg || '失败'); } });
+            }
+          });
+        }
+        if (t.dataset.action === 'del') {
+          layer.confirm('确认删除该爬虫？', { icon: 3 }, function () {
+            fetch('/admin/crawlers/delete/' + id, { method: 'POST' })
+              .then(function (r) { return r.json(); })
+              .then(function (res) { if (res.code === 0) { layer.msg('已删除'); setTimeout(function () { location.reload(); }, 500); } else { layer.msg(res.msg || '失败'); } });
+          });
+        }
+        if (t.dataset.action === 'view-config') {
+          var cfg = tr.children[3] && tr.children[3].textContent;
+          var html = '<div style="padding:12px;max-height:420px;overflow:auto;white-space:pre-wrap">' + (cfg || '') + '</div>';
+          layer.open({ type: 1, title: '配置(JSON)', area: ['720px', '520px'], shadeClose: true, content: html });
+        }
+      });
+      // hover to show full config after 2 seconds
+      (function () {
+        var tipTimer = null;
+        var tipIdx = null;
+        var table = document.querySelector('.crawler-table');
+        if (!table) return;
+        table.addEventListener('mouseover', function (ev) {
+          var td = ev.target.closest('td.cell-clip-2');
+          if (!td) return;
+          if (tipTimer) { clearTimeout(tipTimer); tipTimer = null; }
+          tipTimer = setTimeout(function () {
+            var full = td.textContent || '';
+            if (!full) return;
+            try { tipIdx = layer.tips(full, td, { tips: [1, '#333'], time: 0 }); } catch (e) { }
+          }, 2000);
+        });
+        table.addEventListener('mouseout', function (ev) {
+          var td = ev.target.closest('td.cell-clip-2');
+          if (!td) return;
+          if (tipTimer) { clearTimeout(tipTimer); tipTimer = null; }
+          if (tipIdx) { try { layer.close(tipIdx); } catch (e) { } tipIdx = null; }
+        });
+      })();
+    });
+  </script>
+  {% endblock %}

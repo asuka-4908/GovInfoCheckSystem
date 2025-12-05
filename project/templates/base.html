@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}GovBiz Monitor AI{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='layui-v2.13.2/layui/css/layui.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
     <style>
         .layui-layout-admin .layui-header {
             background-color: #393D49;
@@ -44,18 +45,7 @@
                     style="height:28px;vertical-align:middle;margin-right:8px">
                 {{ settings.app_name }}
             </div>
-            <ul class="layui-nav layui-layout-left">
-                <li class="layui-nav-item"><a href="{{ url_for('main.index') }}">控制台</a></li>
-                {% if current_user.is_admin %}
-                <li class="layui-nav-item"><a href="javascript:;">系统管理</a>
-                    <dl class="layui-nav-child">
-                        <dd><a href="{{ url_for('admin.user_list') }}">用户管理</a></dd>
-                        <dd><a href="{{ url_for('admin.role_list') }}">角色管理</a></dd>
-                        <dd><a href="{{ url_for('admin.settings') }}">系统设置</a></dd>
-                    </dl>
-                </li>
-                {% endif %}
-            </ul>
+            
             <ul class="layui-nav layui-layout-right">
                 <li class="layui-nav-item">
                     <a href="javascript:;">
@@ -75,13 +65,13 @@
                         <dl class="layui-nav-child">
                             <dd><a href="{{ url_for('main.index') }}">首页</a></dd>
                             {% if current_user.is_admin %}
-                            <dd><a href="{{ url_for('admin.settings') }}">后台管理</a></dd>
                             <dd><a href="{{ url_for('admin.user_list') }}">用户管理</a></dd>
                             <dd><a href="{{ url_for('admin.settings') }}">系统设置</a></dd>
                             <dd><a href="{{ url_for('admin.crawl_manage') }}">数据采集管理</a></dd>
                             <dd><a href="{{ url_for('admin.warehouse') }}">数据仓库管理</a></dd>
                             <dd><a href="{{ url_for('admin.rules') }}">采集规则库</a></dd>
-                            <dd><a href="{{ url_for('admin.ai_engines') }}">AI引擎管理</a></dd>
+        <dd><a href="{{ url_for('admin.ai_engines') }}">AI引擎管理</a></dd>
+        <dd><a href="{{ url_for('admin.ai_tools') }}">AI数据清洗分析</a></dd>
                             <dd><a href="{{ url_for('admin.crawlers') }}">爬虫管理</a></dd>
                             {% endif %}
                         </dl>
@@ -107,9 +97,31 @@
 
     </div>
     <script src="{{ url_for('static', filename='layui-v2.13.2/layui/layui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script>
         layui.use('element', function () {
             var element = layui.element;
+            try {
+                var cur = location.pathname;
+                var links = document.querySelectorAll('.layui-side .layui-nav a[href]');
+                links.forEach(function(a){
+                    var href = a.getAttribute('href');
+                    if (!href) return;
+                    var u = new URL(href, location.origin);
+                    if (u.pathname === cur) {
+                        var dd = a.parentElement;
+                        if (dd && dd.classList) dd.classList.add('layui-this');
+                    }
+                    a.addEventListener('click', function(e){
+                        var h = a.getAttribute('href');
+                        if (!h) return;
+                        var pu = new URL(h, location.origin);
+                        if (pu.pathname === location.pathname) {
+                            e.preventDefault();
+                        }
+                    });
+                });
+            } catch(e) {}
         });
     </script>
     {% block scripts %}{% endblock %}

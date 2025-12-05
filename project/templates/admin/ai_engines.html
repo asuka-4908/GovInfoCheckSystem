@@ -28,10 +28,11 @@
           <div class="engine-field">API Key：<span class="mask">{{ r.api_key[:4] }}****{{ r.api_key[-4:] if r.api_key|length>8 else '' }}</span></div>
           <div class="engine-field">状态：<span class="tag {{ 'on' if r.enabled==1 else 'off' }}">{{ '启用' if r.enabled==1 else '停用' }}</span></div>
         </div>
-        <div class="engine-actions">
-          <button class="layui-btn layui-btn-sm" data-action="edit"><i class="layui-icon layui-icon-edit"></i>编辑</button>
-          <button class="layui-btn layui-btn-sm layui-btn-danger" data-action="del"><i class="layui-icon layui-icon-delete"></i>删除</button>
-        </div>
+      <div class="engine-actions">
+        <button class="layui-btn layui-btn-sm" data-action="edit"><i class="layui-icon layui-icon-edit"></i>编辑</button>
+        <button class="layui-btn layui-btn-sm layui-btn-danger" data-action="del"><i class="layui-icon layui-icon-delete"></i>删除</button>
+        <button class="layui-btn layui-btn-sm layui-btn-normal" data-action="chat"><i class="layui-icon layui-icon-chat"></i>对话</button>
+      </div>
       </div>
       {% endfor %}
       {% if rows|length == 0 %}
@@ -42,17 +43,17 @@
 </div>
 <style>
 .engine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));grid-gap:16px}
-.engine-card{border-radius:12px;background:linear-gradient(135deg,#1f1c2c,#928dab);color:#fff;box-shadow:0 8px 16px rgba(0,0,0,.15);position:relative;overflow:hidden}
-.engine-top{padding:16px 16px 8px 16px}
-.engine-badge{font-size:14px;background:rgba(255,255,255,.15);display:inline-block;padding:4px 10px;border-radius:999px}
-.engine-model{font-size:18px;font-weight:700;margin-top:8px}
-.engine-body{background:rgba(0,0,0,.15);padding:12px 16px}
-.engine-field{font-size:13px;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.engine-actions{display:flex;gap:10px;padding:12px 16px}
-.mask{letter-spacing:1px}
-.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px}
-.tag.on{background:#16baaa}
-.tag.off{background:#ff5722}
+.engine-card{border:1px solid var(--border);border-radius:12px;background:#fff;color:#333;box-shadow:0 8px 20px rgba(0,0,0,.05);position:relative;overflow:hidden}
+.engine-top{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.engine-badge{font-size:13px;background:#f3f5f9;color:#333;display:inline-block;padding:4px 10px;border-radius:999px;font-weight:600}
+.engine-model{font-size:14px;color:#666;font-weight:600}
+.engine-body{padding:12px 16px;background:#fff}
+.engine-field{font-size:13px;margin-bottom:6px;word-break:break-all}
+.engine-actions{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border);background:#fafbfc}
+.mask{letter-spacing:.4px;background:#f5f7fa;border-radius:6px;padding:0 6px}
+.tag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;border:1px solid var(--border)}
+.tag.on{background:rgba(95,184,120,.12);color:#2F9688}
+.tag.off{background:rgba(255,87,34,.12);color:#FF5722}
 </style>
 {% endblock %}
 
@@ -121,7 +122,69 @@ layui.use(['layer','form'], function(){
           .then(function(res){ if (res.code===0){ layer.msg('已删除'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
       });
     }
+    if (t.dataset.action === 'chat'){
+      var html = ''
+        +'<div class="chat-wrap">'
+        +  '<div class="chat-header">AI对话 - 引擎ID '+id+'</div>'
+        +  '<div id="chatList" class="chat-list"></div>'
+        +  '<div class="chat-input">'
+        +    '<textarea id="chatPrompt" class="layui-textarea" placeholder="输入内容，Enter发送，Shift+Enter换行"></textarea>'
+        +    '<button id="chatSend" class="layui-btn layui-btn-normal">发送</button>'
+        +  '</div>'
+        +'</div>';
+      layer.open({type:1,title:false,shade:0.2,area:['760px','620px'],content:html});
+      var msgs = [];
+      var list = document.getElementById('chatList');
+      var promptEl = document.getElementById('chatPrompt');
+      var sendBtn = document.getElementById('chatSend');
+      function render(){
+        list.innerHTML = msgs.map(function(m){
+          var cls = m.role === 'user' ? 'msg user' : (m.role === 'assistant' ? 'msg ai' : 'msg sys');
+          return '<div class="'+cls+'"><div class="bubble">'+(m.content||'')+'</div></div>';
+        }).join('');
+        list.scrollTop = list.scrollHeight;
+      }
+      function send(){
+        var text = promptEl.value.trim();
+        if (!text) return;
+        msgs.push({role:'user', content:text});
+        render();
+        promptEl.value='';
+        sendBtn.disabled = true;
+        sendBtn.textContent = '发送中...';
+        var fd = new FormData();
+        fd.append('engine_id', id);
+        fd.append('prompt', text);
+        fd.append('messages', JSON.stringify(msgs));
+        fetch('/admin/ai_chat', {method:'POST', body: fd})
+          .then(function(r){return r.json();})
+          .then(function(res){
+            if (res.code===0){ msgs.push({role:'assistant', content: res.reply||''}); }
+            else { msgs.push({role:'assistant', content: (res.msg||'失败') + (res.err? ('\n'+res.err):'')}); }
+            render();
+          })
+          .catch(function(){ msgs.push({role:'assistant', content:'网络错误'}); render(); })
+          .finally(function(){ sendBtn.disabled=false; sendBtn.textContent='发送'; });
+      }
+      sendBtn.addEventListener('click', send);
+      promptEl.addEventListener('keydown', function(e){
+        if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+      });
+    }
   });
 });
 </script>
+<style>
+.chat-wrap{display:flex;flex-direction:column;height:100%}
+.chat-header{padding:10px 12px;border-bottom:1px solid #eee;font-weight:600}
+.chat-list{flex:1;overflow:auto;padding:12px;gap:10px;background:#f7f7f7}
+.chat-input{display:flex;gap:8px;padding:12px;border-top:1px solid #eee}
+.chat-input textarea{flex:1;height:80px}
+.msg{display:flex;margin:8px 0}
+.msg.user{justify-content:flex-end}
+.msg.ai{justify-content:flex-start}
+.bubble{max-width:70%;padding:8px 10px;border-radius:8px;white-space:pre-wrap;word-break:break-word}
+.msg.user .bubble{background:#409eff;color:#fff}
+.msg.ai .bubble{background:#e6e6e6;color:#333}
+</style>
 {% endblock %}

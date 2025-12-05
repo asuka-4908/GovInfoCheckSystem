@@ -1,10 +1,14 @@
-from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
+from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for, Response
+from flask import stream_with_context
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from .db import query_all, execute_update, query_one
 from .crawler import fetch_items_for_keyword, save_items_for_keyword
 import requests
 import json
+import urllib.parse
+import time
+import re
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -225,19 +229,31 @@ def run_source(source_id):
 
 @bp.route('/crawl/manage')
 def crawl_manage():
-    execute_update("create table if not exists crawlers(\n        id integer primary key autoincrement,\n        name text unique not null,\n        module text,\n        callable text,\n        config text,\n        enabled integer default 1,\n        created_at datetime default current_timestamp\n    )")
-    crawlers = query_all("select * from crawlers where enabled = 1 order by id desc")
+    execute_update("create table if not exists crawlers(\n        id integer primary key autoincrement,\n        name text unique not null,\n        module text,\n        callable text,\n        config text,\n        domain text,\n        enabled integer default 1,\n        created_at datetime default current_timestamp\n     )")
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawlers)")]
+        if 'domain' not in cols:
+            execute_update("alter table crawlers add column domain text")
+    except Exception:
+        pass
+    crawlers = query_all("select * from crawlers where enabled = 1 order by id asc")
     return render_template('admin/crawl_manage.html', crawlers=crawlers)
 
 @bp.route('/crawlers')
 def crawlers():
-    execute_update("create table if not exists crawlers(\n        id integer primary key autoincrement,\n        name text unique not null,\n        module text,\n        callable text,\n        config text,\n        enabled integer default 1,\n        created_at datetime default current_timestamp\n    )")
+    execute_update("create table if not exists crawlers(\n        id integer primary key autoincrement,\n        name text unique not null,\n        module text,\n        callable text,\n        config text,\n        domain text,\n        enabled integer default 1,\n        created_at datetime default current_timestamp\n     )")
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawlers)")]
+        if 'domain' not in cols:
+            execute_update("alter table crawlers add column domain text")
+    except Exception:
+        pass
     q = request.args.get('q', '').strip()
     rows = []
     if q:
-        rows = query_all("select * from crawlers where name like ? or module like ? or callable like ? order by id desc", [f"%{q}%", f"%{q}%", f"%{q}%"]) 
+        rows = query_all("select * from crawlers where name like ? or domain like ? or config like ? order by id asc", [f"%{q}%", f"%{q}%", f"%{q}%"]) 
     else:
-        rows = query_all("select * from crawlers order by id desc")
+        rows = query_all("select * from crawlers order by id asc")
     return render_template('admin/crawlers.html', rows=rows, q=q)
 
 @bp.post('/crawlers/add')
@@ -246,11 +262,12 @@ def crawlers_add():
     module = (request.form.get('module') or '').strip()
     callable_name = (request.form.get('callable') or '').strip()
     config = request.form.get('config') or ''
+    domain = (request.form.get('domain') or '').strip()
     enabled = request.form.get('enabled')
     en = 1 if (enabled in ('1','true','on')) else 1
     if not name:
         return jsonify({'code': 1, 'msg': '名称必填'})
-    execute_update("insert into crawlers(name, module, callable, config, enabled) values(?, ?, ?, ?, ?)", [name, module, callable_name, config, en])
+    execute_update("insert into crawlers(name, module, callable, config, domain, enabled) values(?, ?, ?, ?, ?, ?)", [name, module, callable_name, config, domain, en])
     return jsonify({'code': 0, 'msg': '添加成功'})
 
 @bp.post('/crawlers/update/<int:crawler_id>')
@@ -259,9 +276,10 @@ def crawlers_update(crawler_id: int):
     module = (request.form.get('module') or '').strip()
     callable_name = (request.form.get('callable') or '').strip()
     config = request.form.get('config') or ''
+    domain = (request.form.get('domain') or '').strip()
     enabled = request.form.get('enabled')
     en = 1 if (enabled in ('1','true','on')) else 1
-    execute_update("update crawlers set name=?, module=?, callable=?, config=?, enabled=? where id=?", [name, module, callable_name, config, en, crawler_id])
+    execute_update("update crawlers set name=?, module=?, callable=?, config=?, domain=?, enabled=? where id=?", [name, module, callable_name, config, domain, en, crawler_id])
     return jsonify({'code': 0, 'msg': '已更新'})
 
 @bp.post('/crawlers/delete/<int:crawler_id>')
@@ -269,15 +287,147 @@ def crawlers_delete(crawler_id: int):
     execute_update("delete from crawlers where id = ?", [crawler_id])
     return jsonify({'code': 0, 'msg': '已删除'})
 
+@bp.post('/crawlers/auto_rule')
+def crawlers_auto_rule():
+    test_url = (request.form.get('test_url') or '').strip()
+    request_headers = (request.form.get('request_headers') or '').strip()
+    if not test_url:
+        return jsonify({'code': 1, 'msg': '缺少测试URL'})
+    site = ''
+    try:
+        pu = urllib.parse.urlparse(test_url)
+        site = (pu.netloc or '').lower()
+    except Exception:
+        site = ''
+    if not site:
+        return jsonify({'code': 1, 'msg': 'URL无效'})
+    hdrs = {}
+    if request_headers:
+        try:
+            obj = json.loads(request_headers)
+            if isinstance(obj, dict):
+                hdrs = {str(k): str(v) for k, v in obj.items() if v is not None}
+        except Exception:
+            lines = request_headers.splitlines()
+            i = 0
+            while i < len(lines):
+                k = (lines[i] or '').strip()
+                i += 1
+                if not k:
+                    continue
+                if ':' in k:
+                    parts = k.split(':', 1)
+                    key = parts[0].strip()
+                    val = parts[1].strip()
+                    hdrs[key] = val
+                else:
+                    # next non-empty line as value
+                    j = i
+                    val2 = ''
+                    while j < len(lines):
+                        t = (lines[j] or '').strip()
+                        j += 1
+                        if t:
+                            val2 = t
+                            break
+                    hdrs[k] = val2
+                    i = j
+    try:
+        settings = {s['key']: s['value'] for s in query_all("select * from settings")}
+        proxies = {}
+        if settings.get('http_proxy'):
+            proxies['http'] = settings['http_proxy']
+        if settings.get('https_proxy'):
+            proxies['https'] = settings['https_proxy']
+        ua = settings.get('user_agent') or 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0'
+        headers = {'user-agent': ua, 'accept-language': 'zh-CN,zh;q=0.9'}
+        for k, v in hdrs.items():
+            headers[str(k)] = str(v)
+        r = requests.get(test_url, headers=headers, timeout=10, proxies=proxies or None, allow_redirects=True)
+        raw = r.content
+        enc = r.encoding or r.apparent_encoding or 'utf-8'
+        html = None
+        for candidate in [enc, 'utf-8', 'gbk', 'gb2312', 'big5']:
+            try:
+                html = raw.decode(candidate, errors='ignore')
+                break
+            except Exception:
+                continue
+        if html is None:
+            html = raw.decode('utf-8', errors='ignore')
+        title_xpath = ''
+        content_xpath = ''
+        try:
+            from lxml import html as lhtml
+            import lxml.html
+            doc = lhtml.fromstring(html)
+            # title detect
+            tn2 = doc.xpath('//h1')
+            if tn2:
+                title_xpath = '//h1'
+            # content detect candidates
+            candidates = [
+                "//article",
+                "//div[@id='content']",
+                "//div[contains(@class,'content')]",
+                "//div[contains(@class,'article')]",
+                "//div[contains(@class,'news')]",
+                "//div[contains(@class,'main')]"
+            ]
+            for xp in candidates:
+                cn2 = doc.xpath(xp)
+                if not cn2:
+                    continue
+                txt2 = '\n'.join([c if isinstance(c, str) else (getattr(c, 'text_content', lambda: '')() or '').strip() for c in cn2 if c is not None])
+                if len(txt2) >= 200:
+                    content_xpath = xp
+                    break
+        except Exception:
+            pass
+        # only upsert into crawlers for management visibility; do NOT write into crawl_rules
+        req_hdrs_json = json.dumps(hdrs, ensure_ascii=False) if hdrs else json.dumps({}, ensure_ascii=False)
+        # derive friendly name from domain (2nd-level), excluding common subdomains
+        parts = (site or '').split('.')
+        friendly = ''
+        if len(parts) >= 2:
+            token = parts[-2]
+            if token.lower() in ('www','news') and len(parts) >= 3:
+                token = parts[-3]
+            friendly = token.lower()
+        else:
+            friendly = site
+        execute_update(
+            "insert into crawlers(name, module, callable, config, domain, enabled) values(?, '', '', ?, ?, 1) on conflict(name) do update set config=excluded.config, domain=excluded.domain, enabled=excluded.enabled",
+            [friendly or site, req_hdrs_json, site]
+        )
+        return jsonify({'code': 0, 'msg': '爬虫已更新', 'crawler': {'name': friendly or site, 'domain': site}})
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': str(e)})
+
 @bp.route('/warehouse')
 def warehouse():
     q = request.args.get('q', '').strip()
-    rows = []
+    page = request.args.get('page', type=int) or 1
+    page_size = request.args.get('page_size', type=int) or 20
+    if page < 1:
+        page = 1
+    if page_size < 5:
+        page_size = 5
+    if page_size > 200:
+        page_size = 200
+    params = []
+    where = ''
     if q:
-        rows = query_all("select id, keyword, title, summary, cover, url, source, created_at from crawl_records where title like ? or summary like ? or keyword like ? order by id asc limit 200", [f"%{q}%", f"%{q}%", f"%{q}%"])
-    else:
-        rows = query_all("select id, keyword, title, summary, cover, url, source, created_at from crawl_records order by id asc limit 200")
-    return render_template('admin/warehouse.html', rows=rows, q=q)
+        where = " where title like ? or summary like ? or keyword like ?"
+        params = [f"%{q}%", f"%{q}%", f"%{q}%"]
+    total_row = query_one(f"select count(*) as cnt from crawl_records{where}", params)
+    total = (total_row and total_row.get('cnt')) or 0
+    pages = max(1, (total + page_size - 1) // page_size)
+    if page > pages:
+        page = pages
+    offset = (page - 1) * page_size
+    rows = query_all(f"select id, keyword, title, summary, cover, url, source, created_at from crawl_records{where} order by id asc limit ? offset ?", params + [page_size, offset])
+    return render_template('admin/warehouse.html', rows=rows, q=q, page=page, page_size=page_size, total=total, pages=pages)
 
 @bp.post('/warehouse/update/<int:rid>')
 def warehouse_update(rid: int):
@@ -311,19 +461,20 @@ def warehouse_analyze(rid: int):
     eng = query_one("select * from ai_engines where enabled = 1 order by id desc limit 1")
     if not eng:
         return jsonify({'code': 1, 'msg': '请先在AI引擎管理中配置并启用引擎'})
-    api_url = (eng.get('api_url') or '').rstrip('/')
+    api_url = (eng.get('api_url') or '').strip().rstrip('/')
     model = eng.get('model_name') or ''
     headers = {
         'Authorization': f"Bearer {eng.get('api_key')}",
         'Content-Type': 'application/json'
     }
+    chat_url = api_url + ('/chat/completions' if api_url.endswith('/v1') else '/v1/chat/completions')
     messages = [
         {"role": "system", "content": "你是政府信息审查系统的AI助手。请用中文在200字以内概括要点，提取关键信息，输出纯文本摘要。"},
         {"role": "user", "content": content_text[:12000]}
     ]
     payload = {"model": model, "messages": messages, "temperature": 0.2}
     try:
-        resp = requests.post(f"{api_url}/v1/chat/completions", headers=headers, json=payload, timeout=20)
+        resp = requests.post(chat_url, headers=headers, json=payload, timeout=20)
         data = resp.json()
         if resp.status_code == 200 and isinstance(data, dict):
             try:
@@ -332,10 +483,10 @@ def warehouse_analyze(rid: int):
                 summary = ''
         else:
             summary = ''
-    except Exception:
+    except Exception as e:
         summary = ''
     if not summary:
-        return jsonify({'code': 1, 'msg': '解析失败或无结果'})
+        return jsonify({'code': 1, 'msg': '解析失败或无结果', 'status': resp.status_code if 'resp' in locals() else None, 'err': (data.get('error') if isinstance(data, dict) else str(e) if 'e' in locals() else '')})
     return jsonify({'code': 0, 'summary': summary})
 
 @bp.post('/warehouse/save_detail/<int:rid>')
@@ -516,3 +667,368 @@ def ai_engines_update(engine_id: int):
 def ai_engines_delete(engine_id: int):
     execute_update("delete from ai_engines where id = ?", [engine_id])
     return jsonify({'code': 0, 'msg': '已删除'})
+
+@bp.post('/ai_chat')
+def ai_chat():
+    engine_id = request.form.get('engine_id', type=int)
+    prompt = (request.form.get('prompt') or '').strip()
+    msgs_raw = request.form.get('messages')
+    if not prompt:
+        return jsonify({'code': 1, 'msg': '请输入对话内容'})
+    eng = None
+    if engine_id:
+        eng = query_one("select * from ai_engines where id = ?", [engine_id])
+    if not eng:
+        eng = query_one("select * from ai_engines where enabled = 1 order by id desc limit 1")
+    if not eng:
+        return jsonify({'code': 1, 'msg': '请先配置并启用AI引擎'})
+    api_url = (eng.get('api_url') or '').strip().rstrip('/')
+    model = eng.get('model_name') or ''
+    headers = {
+        'Authorization': f"Bearer {eng.get('api_key')}",
+        'Content-Type': 'application/json'
+    }
+    chat_url = api_url + ('/chat/completions' if api_url.endswith('/v1') else '/v1/chat/completions')
+    messages = None
+    if msgs_raw:
+        try:
+            obj = json.loads(msgs_raw)
+            if isinstance(obj, list) and obj:
+                messages = obj
+        except Exception:
+            messages = None
+    if not messages:
+        messages = [
+            {"role": "system", "content": "你是政务信息采集与合规审查系统的AI助手。你的职责包含数据清洗、去重归并、结构化提取、合规审阅与摘要生成。回答使用简洁中文，必要时给出结构化列表。"},
+            {"role": "user", "content": prompt}
+        ]
+    payload = {"model": model, "messages": messages, "temperature": 0.3}
+    content = ''
+    data = None
+    try:
+        resp = requests.post(chat_url, headers=headers, json=payload, timeout=30)
+        data = resp.json()
+        if resp.status_code == 200 and isinstance(data, dict):
+            try:
+                content = data['choices'][0]['message']['content']
+            except Exception:
+                content = ''
+            if not content:
+                try:
+                    content = data['choices'][0].get('text') or ''
+                except Exception:
+                    content = ''
+            if not content:
+                content = (data.get('output_text') or data.get('result') or '')
+        else:
+            content = ''
+    except Exception as e:
+        content = ''
+    # fallback to completions if chat returns empty
+    if not content:
+        comp_url = api_url + ('/completions' if api_url.endswith('/v1') else '/v1/completions')
+        comp_prompt = "系统: 你是政务数据清洗与分析助手。\n用户: " + prompt + "\n助手:"
+        comp_payload = {"model": model, "prompt": comp_prompt, "temperature": 0.3}
+        try:
+            r2 = requests.post(comp_url, headers=headers, json=comp_payload, timeout=30)
+            d2 = r2.json()
+            if r2.status_code == 200 and isinstance(d2, dict):
+                try:
+                    content = d2['choices'][0].get('text') or ''
+                except Exception:
+                    content = ''
+                if not content:
+                    content = d2.get('output_text') or ''
+        except Exception:
+            pass
+    if not content:
+        return jsonify({'code': 1, 'msg': '对话失败或无结果', 'status': (resp.status_code if 'resp' in locals() else None), 'err': (data.get('error') if isinstance(data, dict) else '')})
+    return jsonify({'code': 0, 'reply': content})
+
+@bp.route('/ai_tools')
+def ai_tools():
+    rows = query_all("select * from ai_engines order by id desc")
+    return render_template('admin/ai_tools.html', engines=rows)
+
+@bp.post('/ai_sql_demo')
+def ai_sql_demo():
+    engine_id = request.form.get('engine_id', type=int)
+    prompt = (request.form.get('prompt') or '').strip()
+    if not prompt:
+        return jsonify({'code': 1, 'msg': '请输入指令'})
+    eng = None
+    if engine_id:
+        eng = query_one("select * from ai_engines where id = ?", [engine_id])
+    if not eng:
+        eng = query_one("select * from ai_engines where enabled = 1 order by id desc limit 1")
+    if not eng:
+        return jsonify({'code': 1, 'msg': '请先配置并启用AI引擎'})
+    api_url = (eng.get('api_url') or '').strip().rstrip('/')
+    model = eng.get('model_name') or ''
+    headers = {'Authorization': f"Bearer {eng.get('api_key')}", 'Content-Type': 'application/json'}
+    chat_url = api_url + ('/chat/completions' if api_url.endswith('/v1') else '/v1/chat/completions')
+    cols = [c['name'] for c in query_all("PRAGMA table_info(ai_engines)")]
+    schema = {
+        'ai_engines': cols
+    }
+    sensitive = ['api_key']
+    allow_cols = [c for c in cols if c not in sensitive]
+    sys_msg = (
+        "你是政务数据清洗与分析助手。根据提供的SQLite表结构，返回一个JSON对象，仅包含一个键sql，"
+        "对应一条只读的SELECT语句。满足以下约束：\n"
+        "1) 只查询 ai_engines 表；\n"
+        "2) 明确列名，禁止使用 * ；\n"
+        "3) 禁止包含敏感列 api_key；\n"
+        "4) 如未说明，默认添加条件 enabled=1；\n"
+        "5) 如未说明，默认 LIMIT 100；\n"
+        "6) 禁止 UPDATE/DELETE/INSERT/DROP/ALTER。"
+    )
+    messages = [
+        {"role": "system", "content": sys_msg + " 表结构:" + json.dumps(schema, ensure_ascii=False)},
+        {"role": "user", "content": prompt}
+    ]
+    payload = {"model": model, "messages": messages, "temperature": 0}
+    sql_out = ''
+    reply_content = ''
+    try:
+        resp = requests.post(chat_url, headers=headers, json=payload, timeout=20)
+        data = resp.json()
+        if resp.status_code == 200 and isinstance(data, dict):
+            try:
+                content = data['choices'][0]['message']['content']
+            except Exception:
+                content = ''
+            reply_content = content or ''
+            try:
+                obj = json.loads(content)
+                sql_out = obj.get('sql') or ''
+            except Exception:
+                sql_out = ''
+    except Exception:
+        sql_out = ''
+    if not sql_out:
+        return jsonify({'code': 1, 'msg': '未生成SQL'})
+    low = sql_out.strip().lower()
+    if not low.startswith('select') or any(x in low for x in ['update ', 'delete ', 'insert ', 'drop ', 'alter ']):
+        return jsonify({'code': 1, 'msg': '仅允许只读SELECT语句'})
+    # 仅允许查询 ai_engines
+    if ' from ' not in low or 'ai_engines' not in low:
+        return jsonify({'code': 1, 'msg': '仅允许查询 ai_engines 表'})
+    # 去除 * 并强制列白名单
+    import re
+    m = re.match(r"\s*select\s+(.*?)\s+from\s+ai_engines(.*)$", sql_out, flags=re.IGNORECASE | re.DOTALL)
+    if m:
+        sel = m.group(1).strip()
+        tail = m.group(2)
+        if '*' in sel or sel == '' or sel.lower() == 'all':
+            sel = ', '.join(allow_cols)
+        else:
+            # 过滤敏感列
+            parts = [p.strip() for p in sel.split(',') if p.strip()]
+            parts = [p for p in parts if p.lower() not in [s.lower() for s in sensitive]]
+            if not parts:
+                parts = allow_cols
+            sel = ', '.join(parts)
+        sql_out = 'SELECT ' + sel + ' FROM ai_engines' + tail
+        low = sql_out.strip().lower()
+    # 默认添加 enabled=1
+    if ' where ' in low:
+        if ' enabled' not in low:
+            sql_out = sql_out.rstrip(';') + ' AND enabled = 1'
+    else:
+        sql_out = sql_out.rstrip(';') + ' WHERE enabled = 1'
+    # 默认 LIMIT 100
+    if ' limit ' not in low:
+        sql_out = sql_out.rstrip(';') + ' LIMIT 100'
+    try:
+        rows = query_all(sql_out)
+        # 过滤返回中的敏感列
+        for r in rows:
+            if 'api_key' in r:
+                r.pop('api_key', None)
+        return jsonify({'code': 0, 'reply': reply_content, 'sql': sql_out, 'rows': rows})
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': str(e), 'sql': sql_out})
+
+@bp.post('/ai_analyze_demo')
+def ai_analyze_demo():
+    engine_id = request.form.get('engine_id', type=int)
+    prompt = (request.form.get('prompt') or '').strip()
+    eng = None
+    if engine_id:
+        eng = query_one("select * from ai_engines where id = ?", [engine_id])
+    if not eng:
+        eng = query_one("select * from ai_engines where enabled = 1 order by id desc limit 1")
+    if not eng:
+        return jsonify({'code': 1, 'msg': '请先配置并启用AI引擎'})
+    api_url = (eng.get('api_url') or '').strip().rstrip('/')
+    model = eng.get('model_name') or ''
+    headers = {'Authorization': f"Bearer {eng.get('api_key')}", 'Content-Type': 'application/json'}
+    chat_url = api_url + ('/chat/completions' if api_url.endswith('/v1') else '/v1/chat/completions')
+    rows = query_all("select id, provider_name, api_url, model_name, enabled, created_at from ai_engines where enabled = 1 order by id desc limit 100")
+    sys_msg = (
+        "你是政务数据清洗与分析助手。请以简洁中文与Markdown输出，"
+        "仅使用二级/三级标题与短列表，不使用一级标题、表格或‘报告’字样，也不包含日期。"
+        "结构为：概览要点、数据特征、异常与风险、处理建议；总字数不超过300。"
+    )
+    user_msg = (prompt or '请分析当前引擎配置，并给出建议。') + "\n数据: " + json.dumps(rows, ensure_ascii=False)
+    messages = [{"role": "system", "content": sys_msg}, {"role": "user", "content": user_msg}]
+    content = ''
+    data = None
+    try:
+        resp = requests.post(chat_url, headers=headers, json={"model": model, "messages": messages, "temperature": 0}, timeout=30)
+        data = resp.json()
+        if resp.status_code == 200 and isinstance(data, dict):
+            try:
+                content = data['choices'][0]['message']['content']
+            except Exception:
+                content = ''
+            if not content:
+                try:
+                    content = data['choices'][0].get('text') or ''
+                except Exception:
+                    content = ''
+            if not content:
+                content = (data.get('output_text') or data.get('result') or '')
+    except Exception:
+        content = ''
+    if not content:
+        return jsonify({'code': 1, 'msg': '分析失败或无结果'})
+    try:
+        content = re.sub(r"(?m)^\s*#\s+.*$", "", content)
+        content = re.sub(r"(?m)^\s*-{3,}\s*$", "", content)
+        content = re.sub(r"报告[（(][^）)]+[）)]", "", content)
+    except Exception:
+        pass
+    return jsonify({'code': 0, 'reply': content})
+
+@bp.get('/ai_analyze_stream')
+def ai_analyze_stream():
+    engine_id = request.args.get('engine_id', type=int)
+    prompt = (request.args.get('prompt') or '').strip()
+    eng = None
+    if engine_id:
+        eng = query_one("select * from ai_engines where id = ?", [engine_id])
+    if not eng:
+        eng = query_one("select * from ai_engines where enabled = 1 order by id desc limit 1")
+    if not eng:
+        def gen_err():
+            yield "data: 请先配置并启用AI引擎\n\n"
+        return Response(stream_with_context(gen_err()), mimetype='text/event-stream')
+    api_url = (eng.get('api_url') or '').strip().rstrip('/')
+    model = eng.get('model_name') or ''
+    headers = {'Authorization': f"Bearer {eng.get('api_key')}", 'Content-Type': 'application/json'}
+    chat_url = api_url + ('/chat/completions' if api_url.endswith('/v1') else '/v1/chat/completions')
+    try:
+        rows = query_all("select id, title, source, keyword, url, created_at from crawl_records where datetime(created_at) >= datetime('now','-2 day') order by created_at desc limit 200")
+    except Exception:
+        rows = []
+    sys_msg = (
+        "你是政务数据清洗与分析助手。请针对数据仓库最近两天的信息进行简洁分析，"
+        "仅使用Markdown的二级/三级标题与短列表，不输出一级标题，不包含日期或‘报告’字样，不使用表格。"
+        "结构为：概览要点、数据特征、异常与风险、处理建议；总字数不超过300。"
+    )
+    user_msg = (prompt or '帮我分析数据仓库前两天信息') + "\n数据: " + json.dumps(rows, ensure_ascii=False)
+    payload = {"model": model, "messages": [{"role": "system", "content": sys_msg}, {"role": "user", "content": user_msg}], "temperature": 0, "stream": True}
+
+    def generate():
+        sent_any = False
+        def clean_chunk(s):
+            try:
+                s = re.sub(r"(?m)^\s*#\s+.*$", "", s)
+                s = re.sub(r"(?m)^\s*-{3,}\s*$", "", s)
+                s = re.sub(r"报告[（(][^）)]+[）)]", "", s)
+            except Exception:
+                pass
+            return s
+        try:
+            with requests.post(chat_url, headers=headers, json=payload, stream=True, timeout=60) as resp:
+                if resp.status_code != 200:
+                    try:
+                        data = resp.json()
+                        err = data.get('error') if isinstance(data, dict) else ''
+                    except Exception:
+                        err = ''
+                    yield f"data: 上游错误({resp.status_code}) {err}\n\n"
+                    return
+                for raw in resp.iter_lines(decode_unicode=False):
+                    if not raw:
+                        continue
+                    try:
+                        line = raw.decode('utf-8', 'replace')
+                    except Exception:
+                        line = ''
+                    if not line:
+                        continue
+                    if line.startswith('data:'):
+                        data_str = line[5:].strip()
+                        if not data_str:
+                            continue
+                        if data_str == '[DONE]':
+                            break
+                        out = ''
+                        try:
+                            obj = json.loads(data_str)
+                            ch = obj.get('choices') or []
+                            if ch:
+                                c0 = ch[0] or {}
+                                delta = c0.get('delta') or {}
+                                out = (delta.get('content') or c0.get('text') or obj.get('output_text') or obj.get('result') or '')
+                        except Exception:
+                            out = ''
+                        if out:
+                            out = out.replace('\r', '')
+                            out = clean_chunk(out)
+                            if out.strip():
+                                yield f"data: {out}\n\n"
+                            sent_any = True
+        except Exception:
+            yield "data: 流式传输失败\n\n"
+        if not sent_any:
+            text = ''
+            try:
+                payload2 = {"model": model, "messages": [{"role": "system", "content": sys_msg}, {"role": "user", "content": user_msg}], "temperature": 0}
+                r2 = requests.post(chat_url, headers=headers, json=payload2, timeout=30)
+                d2 = r2.json() if r2.status_code == 200 else {}
+                if isinstance(d2, dict):
+                    try:
+                        text = d2.get('choices', [{}])[0].get('message', {}).get('content') or ''
+                    except Exception:
+                        text = ''
+                    if not text:
+                        try:
+                            text = d2.get('choices', [{}])[0].get('text') or ''
+                        except Exception:
+                            text = ''
+                    if not text:
+                        text = d2.get('output_text') or d2.get('result') or ''
+            except Exception:
+                pass
+            if not text:
+                try:
+                    comp_url = api_url + ('/completions' if api_url.endswith('/v1') else '/v1/completions')
+                    comp_prompt = sys_msg + "\n" + user_msg
+                    r3 = requests.post(comp_url, headers=headers, json={"model": model, "prompt": comp_prompt, "temperature": 0}, timeout=30)
+                    d3 = r3.json() if r3.status_code == 200 else {}
+                    if isinstance(d3, dict):
+                        try:
+                            text = d3.get('choices', [{}])[0].get('text') or ''
+                        except Exception:
+                            text = ''
+                        if not text:
+                            text = d3.get('output_text') or d3.get('result') or ''
+                except Exception:
+                    pass
+            if text:
+                text = text.replace('\r', '')
+                text = clean_chunk(text)
+                for i in range(0, len(text), 60):
+                    yield f"data: {text[i:i+60]}\n\n"
+                    time.sleep(0.02)
+
+    resp = Response(stream_with_context(generate()), mimetype='text/event-stream')
+    resp.headers['Cache-Control'] = 'no-cache'
+    resp.headers['Connection'] = 'keep-alive'
+    resp.headers['Content-Type'] = 'text/event-stream; charset=utf-8'
+    resp.headers['X-Accel-Buffering'] = 'no'
+    return resp

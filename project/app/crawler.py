@@ -309,7 +309,8 @@ def deep_crawl():
     headers = {
         'user-agent': ua,
         'referer': settings_map.get('referer') or 'https://www.baidu.com/',
-        'accept-language': 'zh-CN,zh;q=0.9'
+        'accept-language': 'zh-CN,zh;q=0.9',
+        'accept-encoding': 'gzip, deflate'
     }
     # 读取采集规则，匹配站点并合并自定义请求头
     rule = None
@@ -335,30 +336,95 @@ def deep_crawl():
     try:
         r = requests.get(url, headers=headers, timeout=10, proxies=proxies or None, allow_redirects=True)
         raw = r.content
-        enc = None
-        try:
-            m1 = re.search(br'<meta[^>]*charset\s*=\s*[\"\']?([a-zA-Z0-9_-]+)', raw, re.IGNORECASE)
-            if m1:
-                enc = m1.group(1).decode('ascii', errors='ignore')
-            else:
+        enc_hdr = (r.headers.get('Content-Encoding') or '').lower()
+        if 'br' in enc_hdr:
+            ok = False
+            try:
+                import brotli
+                raw = brotli.decompress(raw)
+                ok = True
+            except Exception:
+                try:
+                    import brotlicffi as brotli
+                    raw = brotli.decompress(raw)
+                    ok = True
+                except Exception:
+                    ok = False
+            if not ok:
+                try:
+                    hdr2 = dict(headers)
+                    hdr2['accept-encoding'] = 'identity'
+                    r2 = requests.get(url, headers=hdr2, timeout=10, proxies=proxies or None, allow_redirects=True)
+                    raw = r2.content
+                    r = r2
+                    enc_hdr = (r.headers.get('Content-Encoding') or '').lower()
+                except Exception:
+                    pass
+        elif 'gzip' in enc_hdr:
+            try:
+                import gzip
+                raw = gzip.decompress(raw)
+            except Exception:
+                pass
+        elif 'deflate' in enc_hdr:
+            try:
+                import zlib
+                raw = zlib.decompress(raw, -zlib.MAX_WBITS)
+            except Exception:
+                try:
+                    import zlib
+                    raw = zlib.decompress(raw)
+                except Exception:
+                    pass
+        ct = (r.headers.get('Content-Type') or '').lower()
+        if raw[:4] == b'%PDF' or raw[:2] == b'PK':
+            return jsonify({'code': 1, 'msg': '该链接返回非文本内容，暂不支持解析'})
+        def pick_encoding():
+            try:
+                from requests.utils import get_encoding_from_headers
+                enc_h = get_encoding_from_headers(r.headers)
+            except Exception:
+                enc_h = None
+            if enc_h:
+                return enc_h
+            try:
+                m1 = re.search(br'<meta[^>]*charset\s*=\s*[\"\']?([a-zA-Z0-9_-]+)', raw, re.IGNORECASE)
+                if m1:
+                    return m1.group(1).decode('ascii', errors='ignore')
                 m2 = re.search(br'charset\s*=\s*([a-zA-Z0-9_-]+)', raw, re.IGNORECASE)
                 if m2:
-                    enc = m2.group(1).decode('ascii', errors='ignore')
-        except Exception:
-            enc = None
-        if not enc:
-            enc = r.encoding or r.apparent_encoding or 'utf-8'
+                    return m2.group(1).decode('ascii', errors='ignore')
+            except Exception:
+                pass
+            enc_req = r.encoding
+            if enc_req and enc_req.lower() != 'iso-8859-1':
+                return enc_req
+            enc_app = getattr(r, 'apparent_encoding', None)
+            return enc_app or 'utf-8'
+        enc = pick_encoding() or 'utf-8'
         html = None
-        for candidate in [enc, 'utf-8', 'gbk', 'gb2312', 'big5']:
+        candidates = [enc, 'utf-8', 'utf-8-sig', 'gb18030', 'gbk', 'gb2312', 'big5']
+        for candidate in candidates:
             if not candidate:
                 continue
             try:
-                html = raw.decode(candidate, errors='ignore')
-                break
+                h = raw.decode(candidate, errors='replace')
+                low = h.lower()
+                if ('<html' in low) or ('</html>' in low) or ('<div' in low) or ('</div>' in low):
+                    html = h
+                    break
+                if not html:
+                    html = h
             except Exception:
                 continue
         if html is None:
-            html = raw.decode('utf-8', errors='ignore')
+            html = raw.decode('utf-8', errors='replace')
+        try:
+            html = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F]', '', html)
+        except Exception:
+            pass
+        if ct and ('application/pdf' in ct or 'octet-stream' in ct):
+            return jsonify({'code': 1, 'msg': '该链接返回非文本内容，暂不支持解析'})
         # 若存在规则且提供了XPath，尝试按规则提取
         if rule and (rule.get('title_xpath') or rule.get('content_xpath')):
             try:
@@ -634,26 +700,29 @@ def run_crawler(name: str, keyword: str, count: int, config: dict = None):
     if not keyword:
         return []
     reg = {
-        'baidu': collect_baidu_items,
+        # 使用带代理与统一UA的入口提高可用性
+        'baidu': lambda kw, ct: (fetch_items_for_keyword(kw) or [])[:ct],
         'xinhua': collect_xinhua_items
     }
     if name in reg:
         return reg[name](keyword, count)
     try:
+        # rule-based: if name equals a rule site, use site-specific collection
+        rule = query_one("select * from crawl_rules where site = ? and enabled = 1", [name])
+        if rule:
+            return collect_site_items_by_rule(rule.get('site') or name, keyword, count)
         row = query_one("select * from crawlers where name = ? and enabled = 1", [name])
-        if not row:
-            return collect_baidu_items(keyword, count)
-        module = (row.get('module') or '').strip()
-        call = (row.get('callable') or 'run').strip()
-        cfg_raw = config if isinstance(config, dict) else None
-        if not cfg_raw:
-            try:
-                cfg_raw = json.loads(row.get('config') or '{}')
-                if not isinstance(cfg_raw, dict):
+        if row and (row.get('module') or '').strip():
+            module = (row.get('module') or '').strip()
+            call = (row.get('callable') or 'run').strip()
+            cfg_raw = config if isinstance(config, dict) else None
+            if not cfg_raw:
+                try:
+                    cfg_raw = json.loads(row.get('config') or '{}')
+                    if not isinstance(cfg_raw, dict):
+                        cfg_raw = {}
+                except Exception:
                     cfg_raw = {}
-            except Exception:
-                cfg_raw = {}
-        if module:
             import importlib
             m = importlib.import_module(module)
             func = getattr(m, call)
@@ -668,7 +737,54 @@ def crawl_dynamic():
     count = request.args.get('count', type=int) or 10
     source = request.args.get('source', '').strip()
     items = run_crawler(source or 'baidu', keyword, count)
+    if not items:
+        try:
+            rows = query_all(
+                "select title as 标题, summary as 概要, cover as 封面, url as 原始URL, source as 来源 from crawl_records where (keyword like ? or title like ? or summary like ?) order by id desc limit ?",
+                [f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", count]
+            )
+            items = rows or []
+        except Exception:
+            items = []
     return jsonify(items)
+
+def collect_site_items_by_rule(site: str, keyword: str, count: int):
+    site = (site or '').strip()
+    keyword = (keyword or '').strip()
+    count = count or 10
+    if not site:
+        return []
+    settings_map = {s['key']: s['value'] for s in query_all("select * from settings")}
+    ua = settings_map.get('user_agent') or 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0'
+    headers = {
+        'cache-control': 'max-age=0',
+        'referer': 'https://www.baidu.com/',
+        'user-agent': ua,
+        'accept-language': 'zh-CN,zh;q=0.9'
+    }
+    query_word = 'site:' + site + (' ' + keyword if keyword else '')
+    urlb = 'https://www.baidu.com/s'
+    paramsb = {'rtt':'1','bsst':'1','cl':'2','tn':'news','rsv_dl':'ns_pc','word': query_word}
+    try:
+        rb = requests.get(urlb, params=paramsb, headers=headers, timeout=10, allow_redirects=True)
+        items = parse_items(rb.text)
+        if not items:
+            rb2 = requests.get('https://news.baidu.com/ns', params={'word': query_word, 'tn':'news', 'from':'news'}, headers=headers, timeout=10, allow_redirects=True)
+            items = parse_news_items(rb2.text)
+        out = []
+        seen = set()
+        for it in items:
+            k = it.get('原始URL') or it.get('标题')
+            if not k or k in seen:
+                continue
+            it['来源'] = site
+            out.append(it)
+            seen.add(k)
+            if len(out) >= count:
+                break
+        return out
+    except Exception:
+        return []
 
 @bp.post('/save_selection')
 def save_selection():
@@ -676,12 +792,21 @@ def save_selection():
     keyword = data.get('keyword') or ''
     items = data.get('items') or []
     saved = []
+    duplicates = []
     for it in items:
         title = it.get('标题') or it.get('title') or ''
         summary = it.get('概要') or it.get('summary') or ''
         cover = it.get('封面') or it.get('cover') or ''
         url = it.get('原始URL') or it.get('url') or ''
         source = it.get('来源') or it.get('source') or ''
+        exists = None
+        if url:
+            exists = query_one("select id from crawl_records where url = ?", [url])
+        if (not exists) and title and keyword:
+            exists = query_one("select id from crawl_records where title = ? and keyword = ?", [title, keyword])
+        if exists:
+            duplicates.append(exists['id'])
+            continue
         rid = execute_update(
             "insert into crawl_records(keyword, title, summary, cover, url, source) values(?, ?, ?, ?, ?, ?)",
             [keyword, title, summary, cover, url, source]
@@ -694,4 +819,6 @@ def save_selection():
                 [rid, url, deep_text or '', deep_html or '']
             )
         saved.append(rid)
-    return jsonify({'code': 0, 'msg': 'ok', 'ids': saved})
+    if len(items) == 1 and not saved:
+        return jsonify({'code': 2, 'msg': '重复入库'})
+    return jsonify({'code': 0, 'msg': 'ok', 'ids': saved, 'dup_count': len(duplicates)})
