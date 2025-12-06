@@ -131,9 +131,14 @@
                     <li class="layui-nav-item layui-nav-itemed">
                         <a href="javascript:;">系统菜单</a>
                         <dl class="layui-nav-child">
-                            {% for m in menus.general %}
-                            <dd><a href="{{ url_for(m.endpoint) }}">{{ m.display_name }}</a></dd>
+                            {% for m in menus.general %} <dd><a href="{{ url_for(m.endpoint) }}">{{
+                                    m.display_name }}</a></dd>
                             {% endfor %}
+                            <dd><a href="{{ url_for('main.index') }}">首页</a></dd>
+                            <dd><a href="{{ url_for('chat.index') }}">聊天室</a></dd>
+                            <dd><a href="{{ url_for('main.data_board') }}">数据大屏</a></dd>
+                            <dd><a href="{{ url_for('main.crawl_list') }}">数据列表</a></dd>
+                            <dd><a href="{{ url_for('main.ai_tools') }}">AI数据清洗分析</a></dd>
                             {% if current_user.is_admin %}
                             {% for m in menus.admin %}
                             <dd><a href="{{ url_for(m.endpoint) }}">{{ m.display_name }}</a></dd>

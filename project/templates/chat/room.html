@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}聊天室 - {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chart.css') }}">
+
+<div id="chat-app">
+    <!-- Left: User List -->
+    <div class="chat-users" id="chat-users">
+        <div class="users-header">
+            在线用户 (<span id="online-count">0</span>)
+        </div>
+        <div class="users-list" id="users-list">
+            <!-- User items will be appended here -->
+        </div>
+    </div>
+
+    <!-- Right: Chat Area -->
+    <div class="chat-main">
+        <!-- Header -->
+        <div class="chat-header">
+            <div class="header-left">
+                <button class="layui-btn layui-btn-primary layui-btn-sm mobile-toggle" id="toggle-users">
+                    <i class="layui-icon layui-icon-user"></i>
+                </button>
+                <span class="chat-title" id="chat-title">公共群聊</span>
+            </div>
+            <div class="header-right">
+                <button class="layui-btn layui-btn-sm layui-btn-normal" id="btn-history">
+                    <i class="layui-icon layui-icon-list"></i> 历史记录
+                </button>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="chat-messages" id="chat-messages">
+            <!-- Messages will be appended here -->
+            <div class="message-system">欢迎加入聊天室</div>
+        </div>
+
+        <!-- Input -->
+        <div class="chat-footer">
+            <div class="footer-tools">
+                <span class="tool-item emoji-btn" id="emoji-btn">😀</span>
+                <!-- Emoji Picker -->
+                <div class="emoji-picker" id="emoji-picker" style="display:none;">
+                    <div class="emoji-grid" id="emoji-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+            <div class="footer-input">
+                <textarea id="msg-input" placeholder="输入消息..."></textarea>
+            </div>
+            <div class="footer-action">
+                <button class="btn-send" id="btn-send">发送</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Private Chat Windows Container (Hidden by default, dynamically created) -->
+<!-- Actually requirement says "Only 1 private chat window at a time" -->
+<!-- We can simulate this by switching the main view or opening a modal/dialog. 
+     "Popup independent private chat window" -> Usually implies a floating div or a modal. 
+     Given the layout constraints, a floating draggable div or a fixed position div on top might be best.
+-->
+<div id="private-chat-modal" class="private-chat-modal" style="display:none;">
+    <div class="pc-header">
+        <span id="pc-title">与 xxx 私聊</span>
+        <span class="pc-close" id="pc-close">×</span>
+    </div>
+    <div class="pc-messages" id="pc-messages"></div>
+    <div class="pc-footer">
+        <input type="text" id="pc-input" placeholder="发送私聊...">
+        <button id="pc-send">发送</button>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const CURRENT_USER_ID = {{ current_user.id }};
+    const CURRENT_USERNAME = "{{ current_user.username }}";
+</script>
+<script src="{{ url_for('static', filename='js/jquery-3.7.1.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chart.js') }}"></script>
+{% endblock %}
