@@ -4,22 +4,22 @@
 
 {% block content %}
 <div class="layui-row layui-col-space15">
-    <div class="layui-col-md12">
-        <div class="layui-card">
-            <div class="layui-card-header">欢迎回来, {{ user.username }}</div>
-            <div class="layui-card-body">
-                当前角色: <span class="layui-badge layui-bg-blue">{{ user.role_name }}</span>
-                <hr>
-                <p>这里将展示最新的舆情分析报告概览。</p>
-            </div>
+<div class="layui-col-md12">
+    <div class="layui-card">
+        <div class="layui-card-header">欢迎回来, {{ user.username }}</div>
+        <div class="layui-card-body">
+            当前角色: <span class="layui-badge layui-bg-blue">{{ user.role_name }}</span>
+            <hr>
+            <p>这里将展示最新的舆情分析报告概览。</p>
         </div>
     </div>
-    
+</div>
+    {% if current_user.is_admin %}
     <div class="layui-col-md12">
         <div class="layui-card">
-            <div class="layui-card-header">用户数据 (API 测试)</div>
+            <div class="layui-card-header">用户数据</div>
             <div class="layui-card-body">
-                <button class="layui-btn" id="loadBtn">加载用户数据</button>
+                <button class="layui-btn" id="loadBtn">刷新用户数据</button>
                 <table class="layui-table" id="userTable">
                   <thead>
                     <tr><th>ID</th><th>用户名</th><th>角色ID</th><th>创建时间</th></tr>
@@ -29,12 +29,13 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    document.getElementById('loadBtn').addEventListener('click', async () => {
+    async function loadUserData() {
       const res = await fetch('/api/users');
       if (res.ok) {
           const data = await res.json();
@@ -46,8 +47,16 @@
             tbody.appendChild(tr);
           }
       } else {
-          alert('加载失败，请确保已登录');
+          layer.msg('加载失败，请确保已登录');
       }
+    }
+
+    // Auto load on page ready
+    loadUserData();
+
+    document.getElementById('loadBtn').addEventListener('click', () => {
+        loadUserData();
+        layer.msg('刷新成功');
     });
 </script>
 {% endblock %}

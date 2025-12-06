@@ -31,12 +31,12 @@
         <div class="table-wrap">
           <table class="layui-table crawler-table">
             <colgroup>
-              <col style="width:70px">
+              <col style="width:60px">
+              <col style="width:90px">
               <col style="width:160px">
-              <col style="width:200px">
-              <col style="width:200px">
-              <col style="width:70px">
-              <col style="width:220px">
+              <col style="width:160px">
+              <col style="width:60px">
+              <col style="width:300px">
             </colgroup>
             <thead>
               <tr>
@@ -65,6 +65,7 @@
                     <button class="layui-btn layui-btn-sm" data-action="edit">编辑</button>
                     <button class="layui-btn layui-btn-sm layui-btn-danger" data-action="del">删除</button>
                     <button class="layui-btn layui-btn-sm layui-btn-primary" data-action="view-config">查看配置</button>
+                    <button class="layui-btn layui-btn-sm layui-btn-warm" data-action="test">效果测试</button>
                   </div>
                 </td>
               </tr>
@@ -129,6 +130,7 @@
       -webkit-box-orient: vertical;
     }
     .crawler-table .op-actions{ flex-wrap: nowrap; }
+    .crawler-table .op-actions .layui-btn{ padding: 0 8px; font-size: 12px; }
   </style>
   {% endblock %}
 
@@ -261,6 +263,38 @@
           fetch('/admin/crawlers/toggle/' + id, { method: 'POST' })
             .then(function (r) { return r.json(); })
             .then(function (res) { if (res.code === 0) { layer.msg('已更新'); setTimeout(function () { location.reload(); }, 500); } else { layer.msg(res.msg || '失败'); } });
+        }
+        if (t.dataset.action === 'test') {
+          layer.open({
+            type: 1,
+            title: '效果测试',
+            area: ['520px', '420px'],
+            content: '<div style="padding:12px">'
+              + '<div class="layui-form-item"><label class="layui-form-label">关键字</label><div class="layui-input-block"><input id="t_kw" class="layui-input" placeholder="例如：四川"></div></div>'
+              + '<div class="layui-form-item"><label class="layui-form-label">数量</label><div class="layui-input-block"><input id="t_ct" type="number" class="layui-input" value="10"></div></div>'
+              + '</div>',
+            btn: ['开始测试', '关闭'],
+            yes: function(){
+              var fd = new FormData();
+              fd.append('keyword', (document.getElementById('t_kw').value || '').trim());
+              fd.append('count', (document.getElementById('t_ct').value || '').trim());
+              layer.msg('测试中...', { icon: 16, shade: 0.2, time: 0 });
+              fetch('/admin/crawlers/test/' + id, { method: 'POST', body: fd })
+                .then(function(r){ return r.json(); })
+                .then(function(res){
+                  layer.closeAll();
+                  if (res.code !== 0) { layer.msg(res.msg || '测试失败'); return; }
+                  var items = res.items || [];
+                  var html = '<div style="padding:10px">'
+                    + '<div style="margin-bottom:8px;color:#666">返回 ' + items.length + ' 条结果</div>'
+                    + '<div style="max-height:420px;overflow:auto"><table class="layui-table"><thead><tr><th>标题</th><th>来源</th><th>链接</th></tr></thead><tbody>'
+                    + items.map(function(it){ var t=(it['标题']||''); var s=(it['来源']||''); var u=(it['原始URL']||''); return '<tr><td>'+t+'</td><td>'+s+'</td><td><a href="'+u+'" target="_blank">'+(u? '打开' : '')+'</a></td></tr>'; }).join('')
+                    + '</tbody></table></div></div>';
+                  layer.open({ type: 1, title: '测试结果预览', area: ['860px', '560px'], shadeClose: true, content: html });
+                })
+                .catch(function(){ layer.closeAll(); layer.msg('网络错误'); });
+            }
+          });
         }
       });
       // hover to show full config after 2 seconds

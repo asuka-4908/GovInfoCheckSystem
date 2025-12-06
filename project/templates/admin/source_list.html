@@ -8,7 +8,7 @@
     <div class="layui-card">
       <div class="layui-card-header">新增数据源</div>
       <div class="layui-card-body">
-        <form class="layui-form" action="{{ url_for('admin.add_source') }}" method="post">
+        <form class="layui-form" action="{{ base_prefix or '/admin' }}/sources/add" method="post">
           <div class="layui-form-item">
             <label class="layui-form-label">关键字</label>
             <div class="layui-input-block">
@@ -35,6 +35,34 @@
             </div>
           </div>
           <div class="layui-form-item">
+            <label class="layui-form-label">行业标签</label>
+            <div class="layui-input-block">
+              <select name="industry" class="layui-input">
+                <option value="">未分类</option>
+                <option value="政务">政务</option>
+                <option value="交通">交通</option>
+                <option value="医疗">医疗</option>
+                <option value="教育">教育</option>
+                <option value="环保">环保</option>
+                <option value="农业">农业</option>
+                <option value="工业">工业</option>
+                <option value="金融">金融</option>
+                <option value="科技">科技</option>
+                <option value="文化">文化</option>
+                <option value="能源">能源</option>
+                <option value="法制">法制</option>
+                <option value="民生">民生</option>
+                <option value="其他">其他</option>
+              </select>
+            </div>
+          </div>
+          <div class="layui-form-item">
+            <label class="layui-form-label">自定义行业</label>
+            <div class="layui-input-block">
+              <input type="text" name="industry_custom" class="layui-input" placeholder="输入自定义行业，优先于选择项">
+            </div>
+          </div>
+          <div class="layui-form-item">
             <div class="layui-input-block">
               <input type="checkbox" name="enabled" value="1" title="启用" checked>
             </div>
@@ -53,24 +81,47 @@
     <div class="layui-card">
       <div class="layui-card-header">数据源列表</div>
       <div class="layui-card-body">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <select id="filterIndustry" class="layui-input" style="max-width:180px">
+            <option value="">全部行业</option>
+            <option value="政务">政务</option>
+            <option value="交通">交通</option>
+            <option value="医疗">医疗</option>
+            <option value="教育">教育</option>
+            <option value="环保">环保</option>
+            <option value="农业">农业</option>
+            <option value="工业">工业</option>
+            <option value="金融">金融</option>
+            <option value="科技">科技</option>
+            <option value="文化">文化</option>
+            <option value="能源">能源</option>
+            <option value="法制">法制</option>
+            <option value="民生">民生</option>
+            <option value="其他">其他</option>
+          </select>
+          <input id="filterKeyword" class="layui-input" placeholder="按关键字过滤" style="max-width:240px">
+          <button class="layui-btn" id="btnApplyFilter">筛选</button>
+          <button class="layui-btn layui-btn-primary" id="btnClearFilter">清空</button>
+        </div>
         <table class="layui-table">
           <thead>
-            <tr><th>ID</th><th>关键字</th><th>爬虫</th><th>启用</th><th>间隔</th><th>上次运行</th><th>操作</th></tr>
+            <tr><th>ID</th><th>关键字</th><th>行业</th><th>爬虫</th><th>启用</th><th>间隔</th><th>上次运行</th><th>操作</th></tr>
           </thead>
           <tbody>
             {% for s in sources %}
-            <tr>
+            <tr data-industry="{{ s.industry }}">
               <td>{{ s.id }}</td>
               <td>{{ s.keyword }}</td>
+              <td>{% if s.industry %}<span class="layui-badge layui-bg-green">{{ s.industry }}</span>{% else %}<span class="layui-badge">未分类</span>{% endif %}</td>
               <td>{{ s.crawler_name }}</td>
               <td>{{  '是' if s.enabled else '否' }}</td>
               <td>{{ s.interval_minutes }}</td>
               <td>{{ s.last_run }}</td>
               <td>
-                <form action="{{ url_for('admin.toggle_source', source_id=s.id) }}" method="post" style="display:inline-block">
+                <form action="{{ base_prefix or '/admin' }}/sources/toggle/{{ s.id }}" method="post" style="display:inline-block">
                   <button class="layui-btn layui-btn-primary layui-btn-sm">启用/禁用</button>
                 </form>
-                <button class="layui-btn layui-btn-sm" onclick="(function(){var html='<div style=\'padding:12px\'>'+'
+                <button class="layui-btn layui-btn-sm" onclick="(function(){var html='<div style=\'padding:12px\'>'+'\
                   <div class=\'layui-form-item\'><label class=\'layui-form-label\'>爬虫</label><div class=\'layui-input-block\'>\
                     <select id=\'f_crawler\' class=\'layui-input\'>\
                       <option value=\'\'>默认(百度)</option>\
@@ -78,13 +129,33 @@
                       <option value=\'xinhua\'>新华社</option>\
                       {% for c in crawlers %}<option value=\'{{ c.name }}\'>{{ c.name }}</option>{% endfor %}\
                     </select>\
-                  </div></div>'+
-                  '<div class=\'layui-form-item\'><label class=\'layui-form-label\'>间隔(分钟)</label><div class=\'layui-input-block\'><input id=\'f_interval\' type=\'number\' class=\'layui-input\' value=\'{{ s.interval_minutes }}\'></div></div>'+
-                  '</div>';layui.use(['layer'],function(){var layer=layui.layer;layer.open({type:1,title:'更新数据源',area:['420px','300px'],content:html,btn:['保存','取消'],success:function(){try{document.getElementById('f_crawler').value='{{ s.crawler_name }}';}catch(e){}},yes:function(){var fd=new FormData();fd.append('crawler_name',document.getElementById('f_crawler').value.trim());fd.append('interval_minutes',document.getElementById('f_interval').value.trim());fetch('/admin/sources/update/{{ s.id }}',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(res){if(res.code===0){layer.msg('已更新');setTimeout(function(){location.reload();},500);}else{layer.msg(res.msg||'失败');}});}});});})()">编辑</button>
-                <form action="{{ url_for('admin.run_source', source_id=s.id) }}" method="post" style="display:inline-block;margin-left:5px">
+                  </div></div>'+'\
+                  <div class=\'layui-form-item\'><label class=\'layui-form-label\'>间隔(分钟)</label><div class=\'layui-input-block\'><input id=\'f_interval\' type=\'number\' class=\'layui-input\' value=\'{{ s.interval_minutes }}\'></div></div>'+'\
+                  <div class=\'layui-form-item\'><label class=\'layui-form-label\'>行业标签</label><div class=\'layui-input-block\'>\
+                    <select id=\'f_industry\' class=\'layui-input\'>\
+                      <option value=\'\'>未分类</option>\
+                      <option value=\'政务\'>政务</option>\
+                      <option value=\'交通\'>交通</option>\
+                      <option value=\'医疗\'>医疗</option>\
+                      <option value=\'教育\'>教育</option>\
+                      <option value=\'环保\'>环保</option>\
+                      <option value=\'农业\'>农业</option>\
+                      <option value=\'工业\'>工业</option>\
+                      <option value=\'金融\'>金融</option>\
+                      <option value=\'科技\'>科技</option>\
+                      <option value=\'文化\'>文化</option>\
+                      <option value=\'能源\'>能源</option>\
+                      <option value=\'法制\'>法制</option>\
+                      <option value=\'民生\'>民生</option>\
+                      <option value=\'其他\'>其他</option>\
+                    </select>\
+                  </div></div>'+'\
+                  <div class=\'layui-form-item\'><label class=\'layui-form-label\'>自定义行业</label><div class=\'layui-input-block\'><input id=\'f_industry_custom\' class=\'layui-input\' value=\'{{ s.industry }}\' placeholder=\'输入自定义行业，优先于选择项\'></div></div>'+'\
+                  </div>';layui.use(['layer'],function(){var layer=layui.layer;layer.open({type:1,title:'更新数据源',area:['420px','420px'],content:html,btn:['保存','取消'],success:function(){try{document.getElementById('f_crawler').value='{{ s.crawler_name }}';}catch(e){}try{document.getElementById('f_industry').value='{{ s.industry }}';}catch(e){}},yes:function(){var fd=new FormData();fd.append('crawler_name',document.getElementById('f_crawler').value.trim());fd.append('interval_minutes',document.getElementById('f_interval').value.trim());fd.append('industry',document.getElementById('f_industry').value.trim());fd.append('industry_custom',document.getElementById('f_industry_custom').value.trim());fetch('{{ base_prefix or '/admin' }}/sources/update/{{ s.id }}',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(res){if(res.code===0){layer.msg('已更新');setTimeout(function(){location.reload();},500);}else{layer.msg(res.msg||'失败');}});}});});})()">编辑</button>
+                <form action="{{ base_prefix or '/admin' }}/sources/run/{{ s.id }}" method="post" style="display:inline-block;margin-left:5px">
                   <button class="layui-btn layui-btn-normal layui-btn-sm">立即采集</button>
                 </form>
-                <form action="{{ url_for('admin.delete_source', source_id=s.id) }}" method="post" style="display:inline-block;margin-left:5px">
+                <form action="{{ base_prefix or '/admin' }}/sources/delete/{{ s.id }}" method="post" style="display:inline-block;margin-left:5px">
                   <button class="layui-btn layui-btn-danger layui-btn-sm">删除</button>
                 </form>
               </td>
@@ -96,4 +167,27 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+layui.use([], function(){
+  var sel = document.getElementById('filterIndustry');
+  var kw = document.getElementById('filterKeyword');
+  var btn = document.getElementById('btnApplyFilter');
+  var clr = document.getElementById('btnClearFilter');
+  function apply(){
+    var ind = (sel && sel.value) || '';
+    var text = (kw && kw.value.trim()) || '';
+    var rows = Array.prototype.slice.call(document.querySelectorAll('tbody tr'));
+    rows.forEach(function(tr){
+      var okInd = !ind || (tr.getAttribute('data-industry') === ind);
+      var okKw = !text || ((tr.children[1].textContent || '').indexOf(text) >= 0);
+      tr.style.display = (okInd && okKw) ? '' : 'none';
+    });
+  }
+  if (btn) btn.addEventListener('click', apply);
+  if (clr) clr.addEventListener('click', function(){ if (sel) sel.value=''; if (kw) kw.value=''; apply(); });
+});
+</script>
 {% endblock %}

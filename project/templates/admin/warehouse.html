@@ -94,11 +94,12 @@
       var pages = {{ pages }};
       var page = {{ page }};
       var pageSize = {{ page_size }};
+      var BASE = "{{ base_prefix or '/admin' }}";
       function goto(p, ps){
         if (p < 1) p = 1;
         if (p > pages) p = pages;
         var q = document.getElementById('q').value.trim();
-        var url = '/admin/warehouse?page=' + p + '&page_size=' + ps;
+        var url = BASE + '/warehouse?page=' + p + '&page_size=' + ps;
         if (q) url += '&q=' + encodeURIComponent(q);
         location.href = url;
       }
@@ -106,11 +107,11 @@
         var q = document.getElementById('q').value.trim();
         var psEl = document.getElementById('pageSizeInput');
         var ps = (psEl ? parseInt(psEl.value) : pageSize) || pageSize;
-        var url = '/admin/warehouse?page=1&page_size=' + ps;
+        var url = BASE + '/warehouse?page=1&page_size=' + ps;
         if (q) url += '&q=' + encodeURIComponent(q);
         location.href = url;
       });
-      document.getElementById('btnRefresh').addEventListener('click', function () { location.href = '/admin/warehouse?page=1&page_size=' + pageSize; });
+      document.getElementById('btnRefresh').addEventListener('click', function () { location.href = BASE + '/warehouse?page=1&page_size=' + pageSize; });
       var psInput = document.getElementById('pageSizeInput');
       if (psInput){
         var psTimer = null;
@@ -136,7 +137,7 @@
         var ids = getSelectedIds();
         if (!ids.length){ layer.msg('请先选择要删除的条目'); return; }
         layer.confirm('确认批量删除选中条目及其详细？',{icon:3}, function(){
-          fetch('/admin/warehouse/batch_delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ids: ids }) })
+          fetch(BASE + '/warehouse/batch_delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ids: ids }) })
             .then(function(r){ return r.json(); })
             .then(function(res){ if (res.code===0){ layer.msg('已删除 '+(res.count||ids.length)+' 条'); setTimeout(function(){ location.reload(); }, 600); } else { layer.msg(res.msg||'失败'); } });
         });
@@ -146,7 +147,7 @@
         var ids = getSelectedIds();
         if (!ids.length){ layer.msg('请先选择要采集的条目'); return; }
         layer.msg('开始批量深度采集…');
-        fetch('/admin/warehouse/batch_collect', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ids: ids }) })
+          fetch(BASE + '/warehouse/batch_collect', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ids: ids }) })
           .then(function(r){ return r.json(); })
           .then(function(res){ if (res.code===0){ layer.msg('已采集 '+(res.count||ids.length)+' 条'); } else { layer.msg(res.msg||'失败'); } });
       });
@@ -179,7 +180,7 @@
               fd.append('url', document.getElementById('f_url').value);
               fd.append('source', document.getElementById('f_source').value);
               fd.append('keyword', document.getElementById('f_keyword').value);
-              fetch('/admin/warehouse/update/' + id, { method: 'POST', body: fd })
+              fetch(BASE + '/warehouse/update/' + id, { method: 'POST', body: fd })
                 .then(function (r) { return r.json(); })
                 .then(function (res) { if (res.code === 0) { layer.msg('已保存'); setTimeout(function () { location.reload(); }, 500); } else { layer.msg(res.msg || '失败'); } });
             }
@@ -187,20 +188,30 @@
         }
         if (t.dataset.action === 'del') {
           layer.confirm('确认删除该条数据及其详细？', { icon: 3 }, function () {
-            fetch('/admin/warehouse/delete/' + id, { method: 'POST' })
+            fetch(BASE + '/warehouse/delete/' + id, { method: 'POST' })
               .then(function (r) { return r.json(); })
               .then(function (res) { if (res.code === 0) { layer.msg('已删除'); setTimeout(function () { location.reload(); }, 500); } else { layer.msg(res.msg || '失败'); } });
           });
         }
         if (t.dataset.action === 'detail') {
-          fetch('/admin/warehouse/detail/' + id)
+          fetch(BASE + '/warehouse/detail/' + id)
             .then(function (r) { return r.json(); })
             .then(function (res) { var d = res.detail || {}; var txt = d.content_text || ''; var html = d.content_html || ''; layer.open({ type: 1, title: '详细内容', area: ['800px', '600px'], content: '<div style="padding:10px"><div style="margin-bottom:8px;color:#666">正文（文本）</div><div style="max-height:200px;overflow:auto;white-space:pre-wrap">' + txt + '</div><div style="margin-top:12px;color:#666">原文（HTML）</div><div style="max-height:260px;overflow:auto;">' + html + '</div></div>' }); });
         }
         if (t.dataset.action === 'analyze') {
-          fetch('/admin/warehouse/analyze/' + id, { method: 'POST' })
+          layer.msg('AI解析中...', { icon: 16, shade: 0.2, time: 0 });
+          fetch(BASE + '/warehouse/analyze/' + id, { method: 'POST' })
             .then(function (r) { return r.json(); })
-            .then(function (res) { layer.msg(res.msg || '未实现'); });
+            .then(function (res) {
+              layer.closeAll();
+              if (res.code === 0) {
+                var summary = res.summary || '';
+                layer.open({ type: 1, title: 'AI解析摘要', area: ['720px', '420px'], shadeClose: true, content: '<div style="padding:12px"><div style="color:#666;margin-bottom:8px">解析结果</div><div style="white-space:pre-wrap;word-break:break-word">'+ summary +'</div></div>' });
+              } else {
+                layer.msg(res.msg || '解析失败');
+              }
+            })
+            .catch(function(){ layer.closeAll(); layer.msg('网络错误'); });
         }
       });
     });

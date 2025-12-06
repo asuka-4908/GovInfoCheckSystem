@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flask_login import current_user
 import requests
 from bs4 import BeautifulSoup
 from .db import execute_update, query_all, query_one
@@ -200,11 +201,28 @@ def crawl():
     count = request.args.get('count', type=int) or 10
     out = collect_baidu_items(keyword, count)
     if request.args.get('save') == '1':
+        try:
+            cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+        except Exception:
+            cols = []
+        has_uid = 'user_id' in cols
+        uid = None
+        try:
+            if getattr(current_user, 'is_authenticated', False):
+                uid = current_user.id
+        except Exception:
+            uid = None
         for it in out:
-            execute_update(
-                "insert into crawl_records(keyword, title, summary, cover, url, source) values(?, ?, ?, ?, ?, ?)",
-                [keyword, it.get('标题',''), it.get('概要',''), it.get('封面',''), it.get('原始URL',''), it.get('来源','')]
-            )
+            if has_uid:
+                execute_update(
+                    "insert into crawl_records(keyword, title, summary, cover, url, source, user_id) values(?, ?, ?, ?, ?, ?, ?)",
+                    [keyword, it.get('标题',''), it.get('概要',''), it.get('封面',''), it.get('原始URL',''), it.get('来源',''), uid]
+                )
+            else:
+                execute_update(
+                    "insert into crawl_records(keyword, title, summary, cover, url, source) values(?, ?, ?, ?, ?, ?)",
+                    [keyword, it.get('标题',''), it.get('概要',''), it.get('封面',''), it.get('原始URL',''), it.get('来源','')]
+                )
     # 本地库兜底：若外部采集为空，尝试从数据库返回历史记录
     if not out:
         try:
@@ -257,12 +275,23 @@ def fetch_items_for_keyword(keyword):
             it['来源'] = '百度'
     return items
 
-def save_items_for_keyword(keyword, items):
+def save_items_for_keyword(keyword, items, user_id=None):
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+    except Exception:
+        cols = []
+    has_uid = 'user_id' in cols
     for it in items:
-        execute_update(
-            "insert into crawl_records(keyword, title, summary, cover, url, source) values(?, ?, ?, ?, ?, ?)",
-            [keyword, it.get('标题',''), it.get('概要',''), it.get('封面',''), it.get('原始URL',''), it.get('来源','')]
-        )
+        if has_uid:
+            execute_update(
+                "insert into crawl_records(keyword, title, summary, cover, url, source, user_id) values(?, ?, ?, ?, ?, ?, ?)",
+                [keyword, it.get('标题',''), it.get('概要',''), it.get('封面',''), it.get('原始URL',''), it.get('来源',''), user_id]
+            )
+        else:
+            execute_update(
+                "insert into crawl_records(keyword, title, summary, cover, url, source) values(?, ?, ?, ?, ?, ?)",
+                [keyword, it.get('标题',''), it.get('概要',''), it.get('封面',''), it.get('原始URL',''), it.get('来源','')]
+            )
 
 def call_ztbox(keyword: str, proxies: dict, ua: str, referer: str):
     payload = {
@@ -704,19 +733,35 @@ def run_crawler(name: str, keyword: str, count: int, config: dict = None):
     count = count or 10
     if not keyword:
         return []
+    def _normalize(n: str) -> str:
+        x = (n or '').strip().lower()
+        aliases = {
+            '百度': 'baidu', '百度搜索': 'baidu', 'baidu': 'baidu',
+            '新华': 'xinhua', '新华搜索': 'xinhua', 'xinhua': 'xinhua', 'news.cn': 'xinhua', 'xinhuanet': 'xinhua',
+            '360': '360', '360搜索': '360', 'so': '360', 'news.so.com': '360',
+            '中国搜索': 'chinaso', 'chinaso': 'chinaso', 'news.chinaso.com': 'chinaso',
+            '搜狗': 'sogou', 'sogou': 'sogou', 'news.sogou.com': 'sogou',
+            '人民网': 'people', 'people': 'people', 'people.com.cn': 'people', 'news.people.com.cn': 'people'
+        }
+        return aliases.get(x, x)
+    src = _normalize(name)
     reg = {
         # 使用带代理与统一UA的入口提高可用性
         'baidu': lambda kw, ct: (fetch_items_for_keyword(kw) or [])[:ct],
-        'xinhua': collect_xinhua_items
+        'xinhua': collect_xinhua_items,
+        '360': lambda kw, ct: collect_360_items(kw, ct),
+        'chinaso': lambda kw, ct: collect_chinaso_items(kw, ct),
+        'sogou': lambda kw, ct: collect_sogou_items(kw, ct),
+        'people': lambda kw, ct: collect_people_items(kw, ct)
     }
-    if name in reg:
-        return reg[name](keyword, count)
+    if src in reg:
+        return reg[src](keyword, count)
     try:
         # rule-based: if name equals a rule site, use site-specific collection
-        rule = query_one("select * from crawl_rules where site = ? and enabled = 1", [name])
+        rule = query_one("select * from crawl_rules where site = ? and enabled = 1", [src])
         if rule:
-            return collect_site_items_by_rule(rule.get('site') or name, keyword, count)
-        row = query_one("select * from crawlers where name = ? and enabled = 1", [name])
+            return collect_site_items_by_rule(rule.get('site') or src, keyword, count)
+        row = query_one("select * from crawlers where name = ? and enabled = 1", [src])
         if row and (row.get('module') or '').strip():
             module = (row.get('module') or '').strip()
             call = (row.get('callable') or 'run').strip()
@@ -733,8 +778,9 @@ def run_crawler(name: str, keyword: str, count: int, config: dict = None):
             func = getattr(m, call)
             return func(keyword, count, cfg_raw)
     except Exception:
-        return collect_baidu_items(keyword, count)
-    return collect_baidu_items(keyword, count)
+        pass
+    # 指定来源但未匹配到实现时，不回退到百度，避免来源错误
+    return []
 
 @bp.get('/crawl_dynamic')
 def crawl_dynamic():
@@ -742,15 +788,40 @@ def crawl_dynamic():
     count = request.args.get('count', type=int) or 10
     source = request.args.get('source', '').strip()
     items = run_crawler(source or 'baidu', keyword, count)
+    def _normalize(n: str) -> str:
+        x = (n or '').strip().lower()
+        aliases = {'百度':'baidu','百度搜索':'baidu','baidu':'baidu','新华':'xinhua','新华搜索':'xinhua','xinhua':'xinhua','360':'360','360搜索':'360','so':'360','中国搜索':'chinaso','chinaso':'chinaso','搜狗':'sogou','sogou':'sogou','人民网':'people','people':'people'}
+        return aliases.get(x, x)
     if not items:
-        try:
-            rows = query_all(
-                "select title as 标题, summary as 概要, cover as 封面, url as 原始URL, source as 来源 from crawl_records where (keyword like ? or title like ? or summary like ?) order by id desc limit ?",
-                [f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", count]
-            )
-            items = rows or []
-        except Exception:
+        # 若指定了来源且不是百度，不回退到本地库，确保来源一致性
+        if source and _normalize(source) not in ('', 'baidu'):
             items = []
+        else:
+            try:
+                cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+            except Exception:
+                cols = []
+            try:
+                has_uid = 'user_id' in cols
+                uid = None
+                try:
+                    if getattr(current_user, 'is_authenticated', False):
+                        uid = current_user.id
+                except Exception:
+                    uid = None
+                if has_uid and uid is not None:
+                    rows = query_all(
+                        "select title as 标题, summary as 概要, cover as 封面, url as 原始URL, source as 来源 from crawl_records where (keyword like ? or title like ? or summary like ?) and user_id = ? order by id desc limit ?",
+                        [f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", uid, count]
+                    )
+                else:
+                    rows = query_all(
+                        "select title as 标题, summary as 概要, cover as 封面, url as 原始URL, source as 来源 from crawl_records where (keyword like ? or title like ? or summary like ?) order by id desc limit ?",
+                        [f"%{keyword}%", f"%{keyword}%", f"%{keyword}%", count]
+                    )
+                items = rows or []
+            except Exception:
+                items = []
     return jsonify(items)
 
 def collect_site_items_by_rule(site: str, keyword: str, count: int):
@@ -791,6 +862,287 @@ def collect_site_items_by_rule(site: str, keyword: str, count: int):
     except Exception:
         return []
 
+def collect_360_items(keyword: str, count: int):
+    keyword = (keyword or '').strip()
+    count = count or 10
+    settings_map = {s['key']: s['value'] for s in query_all("select * from settings")}
+    proxies = {}
+    if settings_map.get('http_proxy'):
+        proxies['http'] = settings_map['http_proxy']
+    if settings_map.get('https_proxy'):
+        proxies['https'] = settings_map['https_proxy']
+    ua = settings_map.get('user_agent') or 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0'
+    headers = {'user-agent': ua, 'accept-language': 'zh-CN,zh;q=0.9', 'referer': 'https://news.so.com/'}
+    urls = [
+        ('https://news.so.com/ns', {'q': keyword, 'rank': 'time'}),
+        ('https://news.so.com/ns', {'word': keyword})
+    ]
+    items = []
+    seen = set()
+    for base, params in urls:
+        try:
+            r = requests.get(base, params=params, headers=headers, timeout=10, proxies=proxies or None, allow_redirects=True)
+            html = r.text
+            soup = BeautifulSoup(html, 'html.parser')
+            blocks = soup.select('.news-list li') or soup.select('li') or soup.select('div.result')
+            for b in blocks:
+                a = b.select_one('a') or (b if b.name == 'a' else None)
+                if not a:
+                    continue
+                href = a.get('data-url') or a.get('href') or ''
+                title = a.get_text(strip=True)
+                if not href or not title:
+                    continue
+                if '{' in href or '}' in href:
+                    continue
+                if not href.startswith('http'):
+                    continue
+                if title in ('网页','资讯','问答','视频','图片'):
+                    continue
+                k = href or title
+                if k in seen:
+                    continue
+                seen.add(k)
+                summary_el = b.select_one('p') or b.select_one('.summary')
+                summary = summary_el.get_text(strip=True) if summary_el else ''
+                cover = ''
+                img = b.select_one('img')
+                if img and img.has_attr('src'):
+                    cover = img['src']
+                items.append({'标题': title, '概要': summary, '封面': cover, '原始URL': href, '来源': '360搜索'})
+                if len(items) >= count:
+                    break
+        except Exception:
+            continue
+        if len(items) >= count:
+            break
+    items = items[:count]
+    if not items:
+        try:
+            alt = collect_site_items_by_rule('news.so.com', keyword, count)
+            if not alt:
+                alt = collect_site_items_by_rule('so.com', keyword, count)
+            # 替换来源标识为 360搜索
+            for it in (alt or []):
+                it['来源'] = '360搜索'
+            items = alt or []
+        except Exception:
+            items = []
+    return items
+
+def collect_chinaso_items(keyword: str, count: int):
+    keyword = (keyword or '').strip()
+    count = count or 10
+    settings_map = {s['key']: s['value'] for s in query_all("select * from settings")}
+    proxies = {}
+    if settings_map.get('http_proxy'):
+        proxies['http'] = settings_map['http_proxy']
+    if settings_map.get('https_proxy'):
+        proxies['https'] = settings_map['https_proxy']
+    ua = settings_map.get('user_agent') or 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0'
+    headers = {'user-agent': ua, 'accept-language': 'zh-CN,zh;q=0.9', 'referer': 'https://news.chinaso.com/'}
+    urls = [
+        ('https://news.chinaso.com/news/search', {'q': keyword}),
+        ('https://www.chinaso.com/news/search', {'q': keyword})
+    ]
+    items = []
+    seen = set()
+    for base, params in urls:
+        try:
+            r = requests.get(base, params=params, headers=headers, timeout=10, proxies=proxies or None, allow_redirects=True)
+            html = r.text
+            soup = BeautifulSoup(html, 'html.parser')
+            blocks = soup.select('li') or soup.select('.news-list li') or soup.select('div.result')
+            for b in blocks:
+                a = b.select_one('a') or (b if b.name == 'a' else None)
+                if not a:
+                    continue
+                href = a.get('data-url') or a.get('href') or ''
+                title = a.get_text(strip=True)
+                if not href or not title:
+                    continue
+                if '{' in href or '}' in href:
+                    continue
+                if not href.startswith('http'):
+                    continue
+                k = href or title
+                if k in seen:
+                    continue
+                seen.add(k)
+                summary_el = b.select_one('p') or b.select_one('.summary')
+                summary = summary_el.get_text(strip=True) if summary_el else ''
+                cover = ''
+                img = b.select_one('img')
+                if img and img.has_attr('src'):
+                    cover = img['src']
+                items.append({'标题': title, '概要': summary, '封面': cover, '原始URL': href, '来源': '中国搜索'})
+                if len(items) >= count:
+                    break
+        except Exception:
+            continue
+        if len(items) >= count:
+            break
+    items = items[:count]
+    if not items:
+        try:
+            alt = collect_site_items_by_rule('news.chinaso.com', keyword, count)
+            if not alt:
+                alt = collect_site_items_by_rule('chinaso.com', keyword, count)
+            for it in (alt or []):
+                it['来源'] = '中国搜索'
+            items = alt or []
+        except Exception:
+            items = []
+    return items
+
+def collect_sogou_items(keyword: str, count: int):
+    keyword = (keyword or '').strip()
+    count = count or 10
+    settings_map = {s['key']: s['value'] for s in query_all("select * from settings")}
+    proxies = {}
+    if settings_map.get('http_proxy'):
+        proxies['http'] = settings_map['http_proxy']
+    if settings_map.get('https_proxy'):
+        proxies['https'] = settings_map['https_proxy']
+    ua = settings_map.get('user_agent') or 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0'
+    headers = {'user-agent': ua, 'accept-language': 'zh-CN,zh;q=0.9', 'referer': 'https://news.sogou.com/'}
+    items = []
+    seen = set()
+    try:
+        def decode_href(h: str) -> str:
+            try:
+                from urllib.parse import urlparse, parse_qs
+                pu = urlparse(h)
+                if (pu.netloc.endswith('sogou.com')) and pu.path.startswith('/link'):
+                    qs = parse_qs(pu.query)
+                    u = (qs.get('url') or [''])[0]
+                    if u and u.startswith('http'):
+                        return u
+            except Exception:
+                pass
+            return h
+        url = 'https://news.sogou.com/news'
+        params = {'query': keyword, 'ie': 'utf8'}
+        r = requests.get(url, params=params, headers=headers, timeout=10, proxies=proxies or None, allow_redirects=True)
+        html = r.text
+        soup = BeautifulSoup(html, 'html.parser')
+        # 仅限新闻列表容器，避免抓到站内服务分类
+        blocks = soup.select('.news-list li, ul.news-list li, #news_list li')
+        if not blocks:
+            blocks = soup.select('div.vrwrap')
+        for b in blocks:
+            a = b.select_one('a') or (b if b.name == 'a' else None)
+            if not a:
+                continue
+            href = a.get('data-url') or a.get('href') or ''
+            title = a.get_text(strip=True)
+            if not href or not title:
+                continue
+            href = decode_href(href)
+            if '{' in href or '}' in href:
+                continue
+            if not href.startswith('http'):
+                continue
+            # 跳过搜狗自家服务与聚合分类
+            skip_titles = {'网页','图片','视频','微信','知乎','汉语','翻译','问问','百科'}
+            if title in skip_titles:
+                continue
+            if 'sogou.com' in href and ('news.sogou.com' not in href):
+                continue
+            k = href or title
+            if k in seen:
+                continue
+            seen.add(k)
+            p = b.select_one('p') or b.select_one('.summary') or b.select_one('.txt-box') or b.select_one('.news-txt')
+            summary = p.get_text(strip=True) if p else ''
+            img = b.select_one('img')
+            cover = ''
+            if img and img.has_attr('src'):
+                cover = img['src']
+            items.append({'标题': title, '概要': summary, '封面': cover, '原始URL': href, '来源': '搜狗新闻'})
+            if len(items) >= count:
+                break
+    except Exception:
+        pass
+    if not items:
+        try:
+            alt = collect_site_items_by_rule('news.sogou.com', keyword, count)
+            if not alt:
+                alt = collect_site_items_by_rule('sogou.com', keyword, count)
+            filt = []
+            for it in (alt or []):
+                u = (it.get('原始URL') or '')
+                t = (it.get('标题') or '')
+                if not u or not t:
+                    continue
+                if 'sogou.com' in u:
+                    continue
+                skip_titles = {'网页','图片','视频','微信','知乎','汉语','翻译','问问','百科'}
+                if t in skip_titles:
+                    continue
+                it['来源'] = '搜狗新闻'
+                filt.append(it)
+            items = filt
+        except Exception:
+            items = []
+    return items
+
+def collect_people_items(keyword: str, count: int):
+    keyword = (keyword or '').strip()
+    count = count or 10
+    settings_map = {s['key']: s['value'] for s in query_all("select * from settings")}
+    proxies = {}
+    if settings_map.get('http_proxy'):
+        proxies['http'] = settings_map['http_proxy']
+    if settings_map.get('https_proxy'):
+        proxies['https'] = settings_map['https_proxy']
+    ua = settings_map.get('user_agent') or 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0'
+    headers = {'user-agent': ua, 'accept-language': 'zh-CN,zh;q=0.9', 'referer': 'https://www.people.com.cn/'}
+    items = []
+    try:
+        url = 'https://search.people.com.cn/cnpeople/search.do'
+        params = {'keyword': keyword}
+        r = requests.get(url, params=params, headers=headers, timeout=10, proxies=proxies or None, allow_redirects=True)
+        html = r.text
+        soup = BeautifulSoup(html, 'html.parser')
+        blocks = soup.select('#searchResult li') or soup.select('.searchResult li') or soup.select('li')
+        seen = set()
+        for b in blocks:
+            a = b.select_one('a') or (b if b.name == 'a' else None)
+            if not a:
+                continue
+            href = a.get('href') or ''
+            title = a.get_text(strip=True)
+            if not href or not title:
+                continue
+            if not href.startswith('http'):
+                continue
+            k = href or title
+            if k in seen:
+                continue
+            seen.add(k)
+            p = b.select_one('p') or b.select_one('.summary') or b.select_one('span')
+            summary = p.get_text(strip=True) if p else ''
+            img = b.select_one('img')
+            cover = ''
+            if img and img.has_attr('src'):
+                cover = img['src']
+            items.append({'标题': title, '概要': summary, '封面': cover, '原始URL': href, '来源': '人民网'})
+            if len(items) >= count:
+                break
+    except Exception:
+        pass
+    try:
+        alt = collect_site_items_by_rule('people.com.cn', keyword, count)
+        if not alt:
+            alt = collect_site_items_by_rule('news.people.com.cn', keyword, count)
+        for it in (alt or []):
+            it['来源'] = '人民网'
+        items = alt or []
+    except Exception:
+        items = []
+    return items
+
 @bp.post('/save_selection')
 def save_selection():
     data = request.get_json(silent=True) or {}
@@ -798,6 +1150,17 @@ def save_selection():
     items = data.get('items') or []
     saved = []
     duplicates = []
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+    except Exception:
+        cols = []
+    has_uid = 'user_id' in cols
+    uid = None
+    try:
+        if getattr(current_user, 'is_authenticated', False):
+            uid = current_user.id
+    except Exception:
+        uid = None
     for it in items:
         title = it.get('标题') or it.get('title') or ''
         summary = it.get('概要') or it.get('summary') or ''
@@ -806,16 +1169,28 @@ def save_selection():
         source = it.get('来源') or it.get('source') or ''
         exists = None
         if url:
-            exists = query_one("select id from crawl_records where url = ?", [url])
+            if has_uid and uid is not None:
+                exists = query_one("select id from crawl_records where url = ? and user_id = ?", [url, uid])
+            else:
+                exists = query_one("select id from crawl_records where url = ?", [url])
         if (not exists) and title and keyword:
-            exists = query_one("select id from crawl_records where title = ? and keyword = ?", [title, keyword])
+            if has_uid and uid is not None:
+                exists = query_one("select id from crawl_records where title = ? and keyword = ? and user_id = ?", [title, keyword, uid])
+            else:
+                exists = query_one("select id from crawl_records where title = ? and keyword = ?", [title, keyword])
         if exists:
             duplicates.append(exists['id'])
             continue
-        rid = execute_update(
-            "insert into crawl_records(keyword, title, summary, cover, url, source) values(?, ?, ?, ?, ?, ?)",
-            [keyword, title, summary, cover, url, source]
-        )
+        if has_uid:
+            rid = execute_update(
+                "insert into crawl_records(keyword, title, summary, cover, url, source, user_id) values(?, ?, ?, ?, ?, ?, ?)",
+                [keyword, title, summary, cover, url, source, uid]
+            )
+        else:
+            rid = execute_update(
+                "insert into crawl_records(keyword, title, summary, cover, url, source) values(?, ?, ?, ?, ?, ?)",
+                [keyword, title, summary, cover, url, source]
+            )
         deep_text = it.get('deep_content_text')
         deep_html = it.get('deep_content_html')
         if deep_text or deep_html:

@@ -371,7 +371,7 @@
   }
 
   function loadLatest(){
-    fetch('/data_board/latest').then(function(r){return r.json();}).then(function(res){
+    fetch('{{ latest_url }}').then(function(r){return r.json();}).then(function(res){
       if(res.code===0){ 
         var rows = res.rows||[];
         var html = '';
@@ -391,7 +391,7 @@
   }
 
   function loadMapData(){
-    fetch('/data_board/heatmap').then(function(r){return r.json();}).then(function(res){
+    fetch('{{ heatmap_url }}').then(function(r){return r.json();}).then(function(res){
       if(res.code===0){
         globalData = res.data || res; // handle data wrapper structure if needed
         if (res.data) globalData = res.data; // Ensure consistent structure access

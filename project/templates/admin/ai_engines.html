@@ -62,11 +62,12 @@
 layui.use(['layer','form'], function(){
   var layer = layui.layer;
   var form = layui.form;
+  var BASE = "{{ base_prefix or '/admin' }}";
   document.getElementById('btnSearch').addEventListener('click', function(){
     var q = document.getElementById('q').value.trim();
-    location.href = '/admin/ai_engines?q=' + encodeURIComponent(q);
+    location.href = BASE + '/ai_engines?q=' + encodeURIComponent(q);
   });
-  document.getElementById('btnRefresh').addEventListener('click', function(){ location.href = '/admin/ai_engines'; });
+  document.getElementById('btnRefresh').addEventListener('click', function(){ location.href = BASE + '/ai_engines'; });
   document.getElementById('btnAdd').addEventListener('click', function(){
     var html = '<div style="padding:12px">'
       +'<div class="layui-form-item"><label class="layui-form-label">服务商</label><div class="layui-input-block"><input id="f_provider" class="layui-input"></div></div>'
@@ -81,7 +82,7 @@ layui.use(['layer','form'], function(){
       fd.append('api_key', document.getElementById('f_key').value);
       fd.append('model_name', document.getElementById('f_model').value.trim());
       fd.append('enabled', '1');
-      fetch('/admin/ai_engines/add', {method:'POST', body: fd})
+      fetch(BASE + '/ai_engines/add', {method:'POST', body: fd})
         .then(function(r){return r.json();})
         .then(function(res){ if (res.code===0){ layer.msg('已添加'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
     }});
@@ -113,14 +114,14 @@ layui.use(['layer','form'], function(){
         if (k){ fd.append('api_key', k); } else { fd.append('api_key', ''); }
         fd.append('model_name', document.getElementById('f_model').value.trim());
         fd.append('enabled', document.getElementById('f_enabled').checked ? '1' : '0');
-        fetch('/admin/ai_engines/update/'+id, {method:'POST', body: fd})
+        fetch(BASE + '/ai_engines/update/'+id, {method:'POST', body: fd})
           .then(function(r){return r.json();})
           .then(function(res){ if (res.code===0){ layer.msg('已更新'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
       }});
     }
     if (t.dataset.action === 'del'){
       layer.confirm('确认删除该引擎？',{icon:3}, function(){
-        fetch('/admin/ai_engines/delete/'+id, {method:'POST'})
+        fetch(BASE + '/ai_engines/delete/'+id, {method:'POST'})
           .then(function(r){return r.json();})
           .then(function(res){ if (res.code===0){ layer.msg('已删除'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });
       });
@@ -159,7 +160,7 @@ layui.use(['layer','form'], function(){
         fd.append('engine_id', id);
         fd.append('prompt', text);
         fd.append('messages', JSON.stringify(msgs));
-        fetch('/admin/ai_chat', {method:'POST', body: fd})
+        fetch(BASE + '/ai_chat', {method:'POST', body: fd})
           .then(function(r){return r.json();})
           .then(function(res){
             if (res.code===0){ msgs.push({role:'assistant', content: res.reply||''}); }

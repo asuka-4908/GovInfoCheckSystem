@@ -3,6 +3,7 @@ from flask import stream_with_context
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from .db import query_all, execute_update, query_one
+from .menu_service import list_menus, update_menu as menu_update, move_menu, ensure_table as ensure_menu_table, reorder_group
 from .crawler import fetch_items_for_keyword, save_items_for_keyword
 import requests
 import json
@@ -69,6 +70,19 @@ def delete_user(user_id):
     flash('删除成功', 'success')
     return redirect(url_for('admin.user_list'))
 
+@bp.route('/users/toggle_status/<int:user_id>', methods=['POST'])
+def toggle_user_status(user_id):
+    row = query_one("select status from users where id = ?", [user_id])
+    if not row:
+        flash('用户不存在', 'error')
+        return redirect(url_for('admin.user_list'))
+    cur = row.get('status')
+    cur = 1 if cur is None else int(cur)
+    new_val = 0 if cur == 1 else 1
+    execute_update("update users set status = ? where id = ?", [new_val, user_id])
+    flash('已冻结' if new_val == 0 else '已解冻', 'success')
+    return redirect(url_for('admin.user_list'))
+
 @bp.route('/roles')
 def role_list():
     roles = query_all("select * from roles")
@@ -99,70 +113,7 @@ def delete_role(role_id):
     flash('删除成功', 'success')
     return redirect(url_for('admin.role_list'))
 
-@bp.route('/settings')
-def settings():
-    settings_list = query_all("select * from settings")
-    settings_dict = {item['key']: item['value'] for item in settings_list}
-    return render_template('admin/settings.html', settings=settings_dict)
-
-@bp.route('/settings/update', methods=['POST'])
-def update_settings():
-    app_name = request.form.get('app_name')
-    app_logo = request.form.get('app_logo')
-    http_proxy = request.form.get('http_proxy')
-    https_proxy = request.form.get('https_proxy')
-    user_agent = request.form.get('user_agent')
-    referer = request.form.get('referer')
-    sec_ch_ua = request.form.get('sec_ch_ua')
-    sec_ch_ua_platform = request.form.get('sec_ch_ua_platform')
-    sec_ch_ua_mobile = request.form.get('sec_ch_ua_mobile')
-    if app_name:
-        execute_update(
-            "insert into settings(key, value) values(?, ?) on conflict(key) do update set value=excluded.value",
-            ['app_name', app_name]
-        )
-    if app_logo:
-        execute_update(
-            "insert into settings(key, value) values(?, ?) on conflict(key) do update set value=excluded.value",
-            ['app_logo', app_logo]
-        )
-    if http_proxy is not None:
-        execute_update(
-            "insert into settings(key, value) values(?, ?) on conflict(key) do update set value=excluded.value",
-            ['http_proxy', http_proxy]
-        )
-    if https_proxy is not None:
-        execute_update(
-            "insert into settings(key, value) values(?, ?) on conflict(key) do update set value=excluded.value",
-            ['https_proxy', https_proxy]
-        )
-    if user_agent is not None:
-        execute_update(
-            "insert into settings(key, value) values(?, ?) on conflict(key) do update set value=excluded.value",
-            ['user_agent', user_agent]
-        )
-    if referer is not None:
-        execute_update(
-            "insert into settings(key, value) values(?, ?) on conflict(key) do update set value=excluded.value",
-            ['referer', referer]
-        )
-    if sec_ch_ua is not None:
-        execute_update(
-            "insert into settings(key, value) values(?, ?) on conflict(key) do update set value=excluded.value",
-            ['sec_ch_ua', sec_ch_ua]
-        )
-    if sec_ch_ua_platform is not None:
-        execute_update(
-            "insert into settings(key, value) values(?, ?) on conflict(key) do update set value=excluded.value",
-            ['sec_ch_ua_platform', sec_ch_ua_platform]
-        )
-    if sec_ch_ua_mobile is not None:
-        execute_update(
-            "insert into settings(key, value) values(?, ?) on conflict(key) do update set value=excluded.value",
-            ['sec_ch_ua_mobile', sec_ch_ua_mobile]
-        )
-    flash('设置已更新', 'success')
-    return redirect(url_for('admin.settings'))
+# 系统设置功能已移除
 
 @bp.route('/crawls')
 def crawl_list():
@@ -171,6 +122,15 @@ def crawl_list():
 
 @bp.route('/sources')
 def source_list():
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(sources)")]
+    except Exception:
+        cols = []
+    if 'industry' not in cols:
+        try:
+            execute_update("alter table sources add column industry text")
+        except Exception:
+            pass
     sources = query_all("select * from sources order by id desc")
     crawlers = query_all("select * from crawlers order by id desc")
     return render_template('admin/source_list.html', sources=sources, crawlers=crawlers)
@@ -181,13 +141,23 @@ def add_source():
     interval = request.form.get('interval_minutes', type=int)
     enabled = request.form.get('enabled', type=int)
     crawler_name = (request.form.get('crawler_name') or '').strip()
+    industry_raw = (request.form.get('industry') or '').strip()
+    industry_custom = (request.form.get('industry_custom') or '').strip()
+    industry = industry_custom or industry_raw
     if not keyword:
         return jsonify({'code': 1, 'msg': '关键字必填'})
     if not interval:
         interval = 60
     if enabled not in (0,1):
         enabled = 1
-    execute_update("insert into sources(keyword, interval_minutes, enabled, crawler_name) values(?, ?, ?, ?)", [keyword, interval, enabled, crawler_name])
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(sources)")]
+    except Exception:
+        cols = []
+    if 'industry' in cols:
+        execute_update("insert into sources(keyword, interval_minutes, enabled, crawler_name, industry) values(?, ?, ?, ?, ?)", [keyword, interval, enabled, crawler_name, industry])
+    else:
+        execute_update("insert into sources(keyword, interval_minutes, enabled, crawler_name) values(?, ?, ?, ?)", [keyword, interval, enabled, crawler_name])
     return jsonify({'code': 0, 'msg': '添加成功'})
 
 @bp.route('/sources/toggle/<int:source_id>', methods=['POST'])
@@ -208,6 +178,9 @@ def delete_source(source_id):
 def update_source(source_id):
     crawler_name = (request.form.get('crawler_name') or '').strip()
     interval = request.form.get('interval_minutes', type=int)
+    industry_raw = request.form.get('industry')
+    industry_custom = request.form.get('industry_custom')
+    industry = (industry_custom if (industry_custom is not None and industry_custom.strip()) else industry_raw)
     sets = []
     params = []
     if crawler_name is not None:
@@ -216,6 +189,13 @@ def update_source(source_id):
     if interval is not None:
         sets.append('interval_minutes = ?')
         params.append(interval)
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(sources)")]
+    except Exception:
+        cols = []
+    if ('industry' in cols) and (industry is not None):
+        sets.append('industry = ?')
+        params.append((industry or '').strip())
     if not sets:
         return jsonify({'code': 1, 'msg': '无更新内容'})
     params.append(source_id)
@@ -250,14 +230,44 @@ def crawl_manage():
     crawlers = query_all("select * from crawlers where enabled = 1 order by id asc")
     return render_template('admin/crawl_manage.html', crawlers=crawlers)
 
+@bp.post('/crawlers/test/<int:crawler_id>')
+def crawlers_test(crawler_id: int):
+    row = query_one("select * from crawlers where id = ?", [crawler_id])
+    if not row:
+        return jsonify({'code': 1, 'msg': '未找到爬虫'})
+    keyword = (request.form.get('keyword') or '').strip()
+    count = request.form.get('count', type=int) or 10
+    if not keyword:
+        return jsonify({'code': 1, 'msg': '请输入测试关键字'})
+    try:
+        from .crawler import run_crawler
+        name = (row.get('name') or row.get('domain') or '').strip()
+        items = run_crawler(name, keyword, count)
+        return jsonify({'code': 0, 'items': items})
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': str(e)})
+
 @bp.route('/data_board')
 def data_board():
-    return render_template('admin/data_board.html')
+    from flask import url_for
+    latest_url = url_for('admin.data_board_latest')
+    heatmap_url = url_for('admin.data_board_heatmap')
+    return render_template('admin/data_board.html', latest_url=latest_url, heatmap_url=heatmap_url)
 
 @bp.get('/data_board/latest')
 def data_board_latest():
     try:
-        rows = query_all("select id, title, source, keyword, url, created_at from crawl_records order by datetime(created_at) desc limit 20")
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+    except Exception:
+        cols = []
+    try:
+        if 'user_id' in cols:
+            rows = query_all(
+                "select id, title, source, keyword, url, created_at from crawl_records where user_id is null or user_id = ? order by datetime(created_at) desc limit 20",
+                [current_user.id]
+            )
+        else:
+            rows = query_all("select id, title, source, keyword, url, created_at from crawl_records order by datetime(created_at) desc limit 20")
     except Exception:
         rows = []
     return jsonify({'code': 0, 'rows': rows})
@@ -304,7 +314,17 @@ def data_board_heatmap():
         sources.sort(key=lambda x: x['value'], reverse=True)
         return {'map': map_data, 'topWords': top_words, 'sources': sources[:10]}
     try:
-        rows = query_all("select id, title, summary, source, keyword, url, created_at from crawl_records order by datetime(created_at) desc limit 500")
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+    except Exception:
+        cols = []
+    try:
+        if 'user_id' in cols:
+            rows = query_all(
+                "select id, title, summary, source, keyword, url, created_at from crawl_records where user_id is null or user_id = ? order by datetime(created_at) desc limit 500",
+                [current_user.id]
+            )
+        else:
+            rows = query_all("select id, title, summary, source, keyword, url, created_at from crawl_records order by datetime(created_at) desc limit 500")
     except Exception:
         rows = []
     
@@ -330,7 +350,17 @@ def data_board_heatmap():
 @bp.post('/data_board/analyze')
 def data_board_analyze():
     try:
-        rows = query_all("select title, summary, source, keyword, created_at from crawl_records order by datetime(created_at) desc limit 50")
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+    except Exception:
+        cols = []
+    try:
+        if 'user_id' in cols:
+            rows = query_all(
+                "select title, summary, source, keyword, created_at from crawl_records where user_id is null or user_id = ? order by datetime(created_at) desc limit 50",
+                [current_user.id]
+            )
+        else:
+            rows = query_all("select title, summary, source, keyword, created_at from crawl_records order by datetime(created_at) desc limit 50")
     except Exception:
         rows = []
     if not rows:
@@ -554,9 +584,15 @@ def warehouse():
         page_size = 200
     params = []
     where = ''
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+    except Exception:
+        cols = []
     if q:
         where = " where title like ? or summary like ? or keyword like ?"
         params = [f"%{q}%", f"%{q}%", f"%{q}%"]
+    if 'user_id' in cols:
+        where = ((' where ' in where) and (where + " and user_id is null")) or " where user_id is null"
     total_row = query_one(f"select count(*) as cnt from crawl_records{where}", params)
     total = (total_row and total_row.get('cnt')) or 0
     pages = max(1, (total + page_size - 1) // page_size)
@@ -574,11 +610,27 @@ def warehouse_update(rid: int):
     url = request.form.get('url')
     source = request.form.get('source')
     keyword = request.form.get('keyword')
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+    except Exception:
+        cols = []
+    if 'user_id' in cols:
+        row = query_one("select user_id from crawl_records where id = ?", [rid])
+        if row and (row.get('user_id') is not None):
+            return jsonify({'code': 1, 'msg': '仅能编辑系统仓库数据'})
     execute_update("update crawl_records set title=?, summary=?, cover=?, url=?, source=?, keyword=? where id=?", [title or '', summary or '', cover or '', url or '', source or '', keyword or '', rid])
     return jsonify({'code': 0, 'msg': '已更新'})
 
 @bp.post('/warehouse/delete/<int:rid>')
 def warehouse_delete(rid: int):
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+    except Exception:
+        cols = []
+    if 'user_id' in cols:
+        row = query_one("select user_id from crawl_records where id = ?", [rid])
+        if row and (row.get('user_id') is not None):
+            return jsonify({'code': 1, 'msg': '仅能删除系统仓库数据'})
     execute_update("delete from crawl_details where record_id = ?", [rid])
     execute_update("delete from crawl_records where id = ?", [rid])
     return jsonify({'code': 0, 'msg': '已删除'})
@@ -592,6 +644,14 @@ def warehouse_batch_delete():
     cnt = 0
     for rid in ids:
         try:
+            cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+        except Exception:
+            cols = []
+        try:
+            if 'user_id' in cols:
+                row = query_one("select user_id from crawl_records where id = ?", [rid])
+                if row and (row.get('user_id') is not None):
+                    continue
             execute_update("delete from crawl_details where record_id = ?", [rid])
             execute_update("delete from crawl_records where id = ?", [rid])
             cnt += 1
@@ -609,7 +669,14 @@ def warehouse_batch_collect():
     cnt = 0
     for rid in ids:
         try:
-            rec = query_one("select url, source from crawl_records where id = ?", [rid])
+            cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+        except Exception:
+            cols = []
+        try:
+            qsql = "select url, source from crawl_records where id = ?"
+            if 'user_id' in cols:
+                qsql = qsql + " and user_id is null"
+            rec = query_one(qsql, [rid])
             if not rec or not rec.get('url'):
                 continue
             payload = {'url': rec.get('url'), 'source': rec.get('source') or ''}
@@ -628,7 +695,10 @@ def warehouse_batch_collect():
                     except Exception:
                         pass
                 if content_text or content_html:
-                    execute_update("insert into crawl_details(record_id, url, content_text, content_html) select id, url, ?, ? from crawl_records where id=?", [content_text, content_html, rid])
+                    sql_ins = "insert into crawl_details(record_id, url, content_text, content_html) select id, url, ?, ? from crawl_records where id=?"
+                    if 'user_id' in cols:
+                        sql_ins = sql_ins + " and user_id is null"
+                    execute_update(sql_ins, [content_text, content_html, rid])
                     cnt += 1
         except Exception:
             pass
@@ -636,17 +706,44 @@ def warehouse_batch_collect():
 
 @bp.get('/warehouse/detail/<int:rid>')
 def warehouse_detail(rid: int):
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+    except Exception:
+        cols = []
+    if 'user_id' in cols:
+        row = query_one("select user_id from crawl_records where id = ?", [rid])
+        if row and (row.get('user_id') is not None):
+            return jsonify({'code': 1, 'msg': '仅能查看系统仓库数据'})
     detail = query_one("select content_text, content_html from crawl_details where record_id = ? order by id desc limit 1", [rid])
     return jsonify({'code': 0, 'detail': detail or {}})
 
 @bp.post('/warehouse/analyze/<int:rid>')
 def warehouse_analyze(rid: int):
-    detail = query_one("select content_text from crawl_details where record_id = ? order by id desc limit 1", [rid])
-    rec = query_one("select title, summary from crawl_records where id = ?", [rid])
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+    except Exception:
+        cols = []
+    qsql = "select content_text from crawl_details where record_id = ? order by id desc limit 1"
+    rsql = "select title, summary from crawl_records where id = ?"
+    if 'user_id' in cols:
+        row = query_one("select user_id from crawl_records where id = ?", [rid])
+        if row and (row.get('user_id') is not None):
+            return jsonify({'code': 1, 'msg': '仅能解析系统仓库数据'})
+    detail = query_one(qsql, [rid])
+    rec = query_one(rsql, [rid])
     content_text = (detail and detail.get('content_text')) or (rec and rec.get('summary')) or ''
     if not content_text:
         return jsonify({'code': 1, 'msg': '暂无可解析内容，请先进行详细采集'})
-    eng = query_one("select * from ai_engines where enabled = 1 order by id desc limit 1")
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(ai_engines)")]
+    except Exception:
+        cols = []
+    if 'user_id' in cols:
+        eng = query_one("select * from ai_engines where enabled = 1 and user_id is null order by id desc limit 1")
+        if not eng:
+            eng = query_one("select * from ai_engines where enabled = 1 order by id desc limit 1")
+    else:
+        eng = query_one("select * from ai_engines where enabled = 1 order by id desc limit 1")
     if not eng:
         return jsonify({'code': 1, 'msg': '请先在AI引擎管理中配置并启用引擎'})
     api_url = (eng.get('api_url') or '').strip().rstrip('/')
@@ -682,14 +779,33 @@ def warehouse_save_detail(rid: int):
     title = request.form.get('title')
     content_text = request.form.get('content_text') or ''
     content_html = request.form.get('content_html') or ''
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+    except Exception:
+        cols = []
+    if 'user_id' in cols:
+        row = query_one("select user_id from crawl_records where id = ?", [rid])
+        if row and (row.get('user_id') is not None):
+            return jsonify({'code': 1, 'msg': '仅能保存系统仓库数据'})
     if title:
         execute_update("update crawl_records set title=? where id=?", [title, rid])
-    execute_update("insert into crawl_details(record_id, url, content_text, content_html) select id, url, ?, ? from crawl_records where id=?", [content_text, content_html, rid])
+    sql_ins = "insert into crawl_details(record_id, url, content_text, content_html) select id, url, ?, ? from crawl_records where id=?"
+    if 'user_id' in cols:
+        sql_ins = sql_ins + " and user_id is null"
+    execute_update(sql_ins, [content_text, content_html, rid])
     return jsonify({'code': 0, 'msg': 'ok'})
 
 @bp.post('/warehouse/update_summary/<int:rid>')
 def warehouse_update_summary(rid: int):
     summary = request.form.get('summary') or ''
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(crawl_records)")]
+    except Exception:
+        cols = []
+    if 'user_id' in cols:
+        row = query_one("select user_id from crawl_records where id = ?", [rid])
+        if row and (row.get('user_id') is not None):
+            return jsonify({'code': 1, 'msg': '仅能更新系统仓库数据'})
     execute_update("update crawl_records set summary=? where id=?", [summary, rid])
     return jsonify({'code': 0, 'msg': '已更新摘要'})
 
@@ -855,15 +971,57 @@ def rules_toggle(rule_id: int):
     execute_update("update crawl_rules set enabled = ? where id = ?", [new_val, rule_id])
     return jsonify({'code': 0, 'msg': '已更新', 'enabled': new_val})
 
+@bp.route('/menus')
+def menus():
+    ensure_menu_table()
+    general, admin = list_menus()
+    return render_template('admin/menus.html', general=general, admin=admin)
+
+@bp.post('/menus/update/<int:menu_id>')
+def menus_update(menu_id: int):
+    display_name = (request.form.get('display_name') or '').strip()
+    order_no = request.form.get('order_no', type=int)
+    ok = menu_update(menu_id, display_name if display_name else None, order_no)
+    if not ok:
+        return jsonify({'code': 1, 'msg': '无更新内容'})
+    return jsonify({'code': 0, 'msg': '已更新'})
+
+@bp.post('/menus/move_up/<int:menu_id>')
+def menus_move_up(menu_id: int):
+    ensure_menu_table()
+    ok = move_menu(menu_id, 'up')
+    return jsonify({'code': 0 if ok else 1, 'msg': '已上移' if ok else '无法上移'})
+
+@bp.post('/menus/move_down/<int:menu_id>')
+def menus_move_down(menu_id: int):
+    ensure_menu_table()
+    ok = move_menu(menu_id, 'down')
+    return jsonify({'code': 0 if ok else 1, 'msg': '已下移' if ok else '无法下移'})
+
+@bp.post('/menus/reorder')
+def menus_reorder():
+    data = request.get_json(silent=True) or {}
+    ids = data.get('ids') or []
+    group = data.get('admin_only')
+    if not isinstance(ids, list) or group not in (0, 1):
+        return jsonify({'code': 1, 'msg': '参数不全'})
+    ok = reorder_group(group, ids)
+    return jsonify({'code': 0 if ok else 1, 'msg': '已更新' if ok else '更新失败'})
+
 @bp.route('/ai_engines')
 def ai_engines():
     execute_update("create table if not exists ai_engines(\n        id integer primary key autoincrement,\n        provider_name text not null,\n        api_url text not null,\n        api_key text not null,\n        model_name text not null,\n        enabled integer default 1,\n        created_at datetime default current_timestamp\n    )")
-    q = request.args.get('q', '').strip()
-    rows = []
+    try:
+        cols = [c['name'] for c in query_all("PRAGMA table_info(ai_engines)")]
+        if 'user_id' not in cols:
+            execute_update("alter table ai_engines add column user_id integer")
+    except Exception:
+        pass
+    q = (request.args.get('q') or '').strip()
     if q:
-        rows = query_all("select * from ai_engines where provider_name like ? or model_name like ? order by id desc", [f"%{q}%", f"%{q}%"])
+        rows = query_all("select * from ai_engines where (provider_name like ? or model_name like ?) and (user_id is null) order by id desc", [f"%{q}%", f"%{q}%"])
     else:
-        rows = query_all("select * from ai_engines order by id desc")
+        rows = query_all("select * from ai_engines where user_id is null order by id desc")
     return render_template('admin/ai_engines.html', rows=rows, q=q)
 
 @bp.post('/ai_engines/add')
@@ -876,7 +1034,7 @@ def ai_engines_add():
     en = 1 if (enabled in ('1','true','on')) else 0
     if not provider_name or not api_url or not api_key or not model_name:
         return jsonify({'code': 1, 'msg': '参数不全'})
-    execute_update("insert into ai_engines(provider_name, api_url, api_key, model_name, enabled) values(?, ?, ?, ?, ?)", [provider_name, api_url, api_key, model_name, en])
+    execute_update("insert into ai_engines(provider_name, api_url, api_key, model_name, enabled, user_id) values(?, ?, ?, ?, ?, NULL)", [provider_name, api_url, api_key, model_name, en])
     return jsonify({'code': 0, 'msg': '添加成功'})
 
 @bp.post('/ai_engines/update/<int:engine_id>')
@@ -904,7 +1062,9 @@ def ai_chat():
         return jsonify({'code': 1, 'msg': '请输入对话内容'})
     eng = None
     if engine_id:
-        eng = query_one("select * from ai_engines where id = ?", [engine_id])
+        eng = query_one("select * from ai_engines where id = ? and user_id is null", [engine_id])
+    if not eng:
+        eng = query_one("select * from ai_engines where enabled = 1 and user_id is null order by id desc limit 1")
     if not eng:
         eng = query_one("select * from ai_engines where enabled = 1 order by id desc limit 1")
     if not eng:
@@ -1080,7 +1240,3 @@ def ai_sql_demo():
         return jsonify({'code': 0, 'reply': reply_content, 'sql': sql_out, 'rows': rows})
     except Exception as e:
         return jsonify({'code': 1, 'msg': str(e), 'sql': sql_out})
-
-
-
-

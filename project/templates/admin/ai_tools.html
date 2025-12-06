@@ -169,8 +169,9 @@ layui.use(['layer', 'form'], function(){
   document.getElementById('btnStop').addEventListener('click', function(){ try{ currentES && currentES.close(); }catch(e){} try{ lastTyping && lastTyping.remove(); }catch(e){} });
 
   // --- History & Persistence Logic ---
-  var STORAGE_KEY_CURRENT = 'ai_chat_current';
-  var STORAGE_KEY_ARCHIVES = 'ai_chat_archives';
+  var UID = "{{ current_user.id }}";
+  var STORAGE_KEY_CURRENT = 'ai_chat_current_' + UID;
+  var STORAGE_KEY_ARCHIVES = 'ai_chat_archives_' + UID;
 
   function saveState() {
     var msgs = [];

@@ -1,5 +1,5 @@
 from flask import Flask
-from flask_login import LoginManager
+from flask_login import LoginManager, current_user
 from .models import User
 from werkzeug.security import generate_password_hash
 from .db import query_all, execute_update, get_connection, query_one
@@ -55,6 +55,68 @@ def create_app():
                 pwd = generate_password_hash('123456')
                 if rid:
                     execute_update("insert into users(username, password_hash, role_id) values(?, ?, ?)", ['admin', pwd, rid])
+            # menus seed
+            try:
+                cols = query_all("PRAGMA table_info(menus)")
+            except Exception:
+                cols = []
+            if cols:
+                try:
+                    execute_update("delete from menus where endpoint = ?", ['admin.settings'])
+                except Exception:
+                    pass
+                try:
+                    any_menu = query_one("select 1 as x from menus limit 1")
+                except Exception:
+                    any_menu = None
+                if not any_menu:
+                    defaults = [
+                        ('main.index', '首页', 1, 0),
+                        ('main.data_board', '数据大屏', 2, 0),
+                        ('main.crawl_list', '数据列表', 3, 0),
+                        ('main.ai_tools', 'AI数据清洗分析', 4, 0),
+                        ('admin.user_list', '用户管理', 1, 1),
+                        ('admin.crawl_manage', '数据采集管理', 3, 1),
+                        ('admin.warehouse', '数据仓库管理', 4, 1),
+                        ('admin.rules', '采集规则库', 5, 1),
+                        ('admin.ai_engines', 'AI引擎管理', 6, 1),
+                        ('admin.crawlers', '爬虫管理', 7, 1),
+                        ('admin.menus', '菜单管理', 8, 1)
+                    ]
+                    for ep, name, order_no, admin_only in defaults:
+                        try:
+                            execute_update(
+                                "insert into menus(endpoint, display_name, order_no, admin_only) values(?, ?, ?, ?)",
+                                [ep, name, order_no, admin_only]
+                            )
+                        except Exception:
+                            pass
+                try:
+                    exist1 = query_one("select 1 from menus where endpoint = ?", ['main.user_sources'])
+                    if not exist1:
+                        execute_update("insert into menus(endpoint, display_name, order_no, admin_only) values(?, ?, ?, 0)", ['main.user_sources', '数据采集管理', 10])
+                except Exception:
+                    pass
+                try:
+                    exist2 = query_one("select 1 from menus where endpoint = ?", ['main.user_warehouse'])
+                    if not exist2:
+                        execute_update("insert into menus(endpoint, display_name, order_no, admin_only) values(?, ?, ?, 0)", ['main.user_warehouse', '数据仓库管理', 11])
+                except Exception:
+                    pass
+                try:
+                    exist3 = query_one("select 1 from menus where endpoint = ?", ['main.user_ai_engines'])
+                    if not exist3:
+                        execute_update("insert into menus(endpoint, display_name, order_no, admin_only) values(?, ?, ?, 0)", ['main.user_ai_engines', 'AI引擎管理', 12])
+                except Exception:
+                    pass
+                try:
+                    cr = query_one("select order_no from menus where endpoint = ?", ['admin.crawlers'])
+                    mn = query_one("select order_no from menus where endpoint = ?", ['admin.menus'])
+                    if cr and mn:
+                        new_no = (cr.get('order_no') or 0) + 1
+                        execute_update("update menus set order_no = ? where endpoint = ?", [new_no, 'admin.menus'])
+                except Exception:
+                    pass
         except Exception:
             pass
     except Exception:
@@ -75,6 +137,31 @@ def create_app():
         settings_list = query_all("select * from settings")
         settings_dict = {item['key']: item['value'] for item in settings_list}
         return dict(settings=settings_dict)
+
+    @app.context_processor
+    def inject_menus():
+        try:
+            general = query_all("select endpoint, display_name from menus where admin_only = 0 order by order_no asc, id asc")
+            admin = query_all("select endpoint, display_name from menus where admin_only = 1 order by order_no asc, id asc")
+        except Exception:
+            general = []
+            admin = []
+        try:
+            endpoints = set(app.url_map._rules_by_endpoint.keys())
+            general = [m for m in general if m.get('endpoint') in endpoints]
+            admin = [m for m in admin if m.get('endpoint') in endpoints]
+            try:
+                if getattr(current_user, 'is_authenticated', False) and getattr(current_user, 'is_admin', False):
+                    hide_eps = {'main.user_sources', 'main.user_warehouse', 'main.user_ai_engines'}
+                    general = [m for m in general if m.get('endpoint') not in hide_eps]
+            except Exception:
+                pass
+        except Exception:
+            pass
+        return dict(menus={
+            'general': general,
+            'admin': admin
+        })
 
     def scheduler_loop():
         while True:
@@ -106,12 +193,14 @@ def create_app():
                                 for c in enabled_crawlers:
                                     try:
                                         its = run_crawler(c.get('name'), s['keyword'], 10)
-                                        save_items_for_keyword(s['keyword'], its)
+                                        uid = s.get('user_id')
+                                        save_items_for_keyword(s['keyword'], its, uid)
                                     except Exception:
                                         continue
                             else:
                                 items = fetch_items_for_keyword(s['keyword'])
-                                save_items_for_keyword(s['keyword'], items)
+                                uid = s.get('user_id')
+                                save_items_for_keyword(s['keyword'], items, uid)
                         execute_update("update sources set last_run = current_timestamp where id = ?", [s['id']])
                 time.sleep(60)
             except Exception:

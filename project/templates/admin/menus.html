@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}菜单管理 - {{ settings.app_name }}{% endblock %}
+
+{% block content %}
+<div class="layui-row layui-col-space15">
+  <div class="layui-col-md12">
+    <div class="layui-card">
+      <div class="layui-card-header">系统菜单</div>
+      <div class="layui-card-body">
+        <table class="layui-table">
+          <thead>
+            <tr><th style="width:60px">序号</th><th>路由</th><th>名称</th><th style="width:160px">操作</th></tr>
+          </thead>
+          <tbody id="generalTbody">
+            {% for m in general %}
+            <tr draggable="true" data-id="{{ m.id }}">
+              <td>{{ loop.index }}</td>
+              <td>{{ m.endpoint }}</td>
+              <td>
+                <form action="{{ url_for('admin.menus_update', menu_id=m.id) }}" method="post" style="display:flex; gap:8px; align-items:center">
+                  <input type="text" name="display_name" value="{{ m.display_name }}" class="layui-input" style="height:32px; width: 180px;">
+                  <button class="layui-btn layui-btn-primary layui-btn-sm">保存</button>
+                </form>
+              </td>
+              <td>
+                <form action="{{ url_for('admin.menus_move_up', menu_id=m.id) }}" method="post" style="display:inline-block;margin-right:6px">
+                  <button class="layui-btn layui-btn-sm layui-btn-primary">上移</button>
+                </form>
+                <form action="{{ url_for('admin.menus_move_down', menu_id=m.id) }}" method="post" style="display:inline-block">
+                  <button class="layui-btn layui-btn-sm layui-btn-primary">下移</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="layui-col-md12">
+    <div class="layui-card">
+      <div class="layui-card-header">管理员菜单</div>
+      <div class="layui-card-body">
+        <table class="layui-table">
+          <thead>
+            <tr><th style="width:60px">序号</th><th>路由</th><th>名称</th><th style="width:160px">操作</th></tr>
+          </thead>
+          <tbody id="adminTbody">
+            {% for m in admin %}
+            <tr draggable="true" data-id="{{ m.id }}">
+              <td>{{ loop.index }}</td>
+              <td>{{ m.endpoint }}</td>
+              <td>
+                <form action="{{ url_for('admin.menus_update', menu_id=m.id) }}" method="post" style="display:flex; gap:8px; align-items:center">
+                  <input type="text" name="display_name" value="{{ m.display_name }}" class="layui-input" style="height:32px; width: 180px;">
+                  <button class="layui-btn layui-btn-primary layui-btn-sm">保存</button>
+                </form>
+              </td>
+              <td>
+                <form action="{{ url_for('admin.menus_move_up', menu_id=m.id) }}" method="post" style="display:inline-block;margin-right:6px">
+                  <button class="layui-btn layui-btn-sm layui-btn-primary">上移</button>
+                </form>
+                <form action="{{ url_for('admin.menus_move_down', menu_id=m.id) }}" method="post" style="display:inline-block">
+                  <button class="layui-btn layui-btn-sm layui-btn-primary">下移</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% block scripts %}
+<script>
+(function(){
+  function postForm(form){
+    var url=form.action; var fd=new FormData(form);
+    fetch(url,{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(res){
+      location.reload();
+    }).catch(function(){ location.reload(); });
+  }
+  document.querySelectorAll('form[action*="/menus/move_"]').forEach(function(f){
+    f.addEventListener('submit', function(e){ e.preventDefault(); postForm(f); });
+  });
+  document.querySelectorAll('form[action*="/menus/update/"]').forEach(function(f){
+    f.addEventListener('submit', function(e){ e.preventDefault(); postForm(f); });
+  });
+  // Drag & Drop reorder
+  function enableDnD(tbody, group){
+    var dragEl = null;
+    tbody.addEventListener('dragstart', function(e){
+      var tr = e.target.closest('tr');
+      if(!tr) return; dragEl = tr; tr.style.opacity = '0.5';
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    tbody.addEventListener('dragover', function(e){ e.preventDefault(); var tr=e.target.closest('tr'); if(!tr||tr===dragEl) return; var rect=tr.getBoundingClientRect(); var halfway = rect.top + rect.height/2; if(e.clientY < halfway){ tbody.insertBefore(dragEl, tr); } else { tbody.insertBefore(dragEl, tr.nextSibling); } });
+    tbody.addEventListener('drop', function(e){ e.preventDefault(); if(dragEl){ dragEl.style.opacity=''; dragEl=null; saveOrder(tbody, group); }});
+    tbody.addEventListener('dragend', function(e){ if(dragEl){ dragEl.style.opacity=''; dragEl=null; }});
+  }
+  function saveOrder(tbody, group){
+    var ids = Array.prototype.map.call(tbody.querySelectorAll('tr[data-id]'), function(tr){ return parseInt(tr.getAttribute('data-id')); });
+    fetch('/admin/menus/reorder', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ids: ids, admin_only: group})})
+      .then(function(r){return r.json();}).then(function(res){ location.reload(); }).catch(function(){ location.reload(); });
+  }
+  var gt = document.getElementById('generalTbody'); if(gt) enableDnD(gt, 0);
+  var at = document.getElementById('adminTbody'); if(at) enableDnD(at, 1);
+})();
+</script>
+{% endblock %}
+{% endblock %}
