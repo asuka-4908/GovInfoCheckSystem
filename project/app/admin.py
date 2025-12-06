@@ -694,6 +694,36 @@ def rules():
         rows = query_all("select * from crawl_rules order by id asc")
     return render_template('admin/rules.html', rows=rows, q=q)
 
+@bp.post('/rules/parse_site')
+def rules_parse_site():
+    url = (request.form.get('url') or '').strip()
+    if not url:
+        return jsonify({'code': 1, 'msg': 'URL不能为空'})
+    try:
+        if not url.startswith('http'):
+            url = 'http://' + url
+        pu = urllib.parse.urlparse(url)
+        domain = (pu.netloc or '').lower()
+        # Intelligent mapping for common sites
+        site_name = domain
+        if 'baidu.com' in domain:
+            site_name = 'baidu'
+        elif 'thepaper.cn' in domain:
+            site_name = 'thepaper'
+        elif 'news.cn' in domain or 'xinhuanet.com' in domain:
+            site_name = 'xinhua'
+        elif 'qq.com' in domain:
+            site_name = 'qq'
+        elif 'sina.com.cn' in domain:
+            site_name = 'sina'
+        elif '163.com' in domain:
+            site_name = '163'
+        elif 'people.com.cn' in domain:
+            site_name = 'people'
+        return jsonify({'code': 0, 'site': site_name})
+    except Exception as e:
+        return jsonify({'code': 1, 'msg': str(e)})
+
 @bp.post('/rules/add')
 def rules_add():
     site = (request.form.get('site') or '').strip()
@@ -1117,6 +1147,7 @@ def ai_analyze_demo():
 def ai_analyze_stream():
     engine_id = request.args.get('engine_id', type=int)
     prompt = (request.args.get('prompt') or '').strip()
+    
     eng = None
     if engine_id:
         eng = query_one("select * from ai_engines where id = ?", [engine_id])
@@ -1265,6 +1296,12 @@ def ai_analyze_stream():
                         yield f"data: {line}\n"
                     yield "\n"
                     time.sleep(0.02)
+                sent_any = True
+        
+        if not sent_any:
+             yield "data: 生成失败，未能获取到有效回复。请检查AI引擎配置。\n\n"
+        
+        yield "data: [DONE]\n\n"
 
     resp = Response(stream_with_context(generate()), mimetype='text/event-stream')
     resp.headers['Cache-Control'] = 'no-cache'

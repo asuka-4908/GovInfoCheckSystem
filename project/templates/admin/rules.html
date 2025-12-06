@@ -83,13 +83,32 @@ layui.use(['layer','form'], function(){
   document.getElementById('btnRefresh').addEventListener('click', function(){ location.href = '/admin/rules'; });
   document.getElementById('btnAdd').addEventListener('click', function(){
     var html = '<div style="padding:10px">'
+      +'<div class="layui-form-item"><label class="layui-form-label">测试URL</label><div class="layui-input-block" style="display:flex;gap:8px"><input id="f_url" placeholder="输入URL自动识别站点" class="layui-input"><button type="button" class="layui-btn layui-btn-primary" id="btnParse">识别</button></div></div>'
       +'<div class="layui-form-item"><label class="layui-form-label">站点</label><div class="layui-input-block"><input id="f_site" placeholder="例如: example.com" class="layui-input"></div></div>'
       +'<div class="layui-form-item"><label class="layui-form-label">标题XPath</label><div class="layui-input-block"><input id="f_title_xpath" class="layui-input" placeholder="//h1"></div></div>'
       +'<div class="layui-form-item"><label class="layui-form-label">内容XPath</label><div class="layui-input-block"><input id="f_content_xpath" class="layui-input" placeholder="//div[@class=\'content\']"></div></div>'
       +'<div class="layui-form-item"><label class="layui-form-label">Headers</label><div class="layui-input-block"><textarea id="f_headers" class="layui-textarea" placeholder="JSON格式，如 {\"user-agent\":\"...\"}"></textarea></div></div>'
       +'<div class="layui-form-item"><label class="layui-form-label">启用</label><div class="layui-input-block"><input type="checkbox" id="f_enabled" checked></div></div>'
       +'</div>';
-    layer.open({type:1,title:'新增规则',area:['700px','520px'],content:html,btn:['保存','取消'],yes:function(){
+    layer.open({type:1,title:'新增规则',area:['700px','580px'],content:html,btn:['保存','取消'],
+      success: function(){
+        document.getElementById('btnParse').addEventListener('click', function(){
+          var u = document.getElementById('f_url').value.trim();
+          if(!u){ layer.msg('请先输入URL'); return; }
+          var fd = new FormData(); fd.append('url', u);
+          fetch('/admin/rules/parse_site', {method:'POST', body:fd})
+            .then(function(r){return r.json()})
+            .then(function(res){
+               if(res.code===0){ 
+                 document.getElementById('f_site').value = res.site; 
+                 layer.msg('识别成功: ' + res.site);
+               } else {
+                 layer.msg(res.msg||'识别失败');
+               }
+            });
+        });
+      },
+      yes:function(){
       var fd = new FormData();
       fd.append('site', document.getElementById('f_site').value.trim());
       fd.append('title_xpath', document.getElementById('f_title_xpath').value);
@@ -114,19 +133,38 @@ layui.use(['layer','form'], function(){
       var headers = tr.children[4].textContent.trim();
       var enabled = tr.children[5].textContent.trim() === '是';
       var html = '<div style="padding:10px">'
-        +'<div class="layui-form-item"><label class="layui-form-label">站点</label><div class="layui-input-block"><input id="f_site" value="'+(site||'')+'" class="layui-input"></div></div>'
-        +'<div class="layui-form-item"><label class="layui-form-label">标题XPath</label><div class="layui-input-block"><input id="f_title_xpath" value="'+(title_xpath||'')+'" class="layui-input"></div></div>'
-        +'<div class="layui-form-item"><label class="layui-form-label">内容XPath</label><div class="layui-input-block"><input id="f_content_xpath" value="'+(content_xpath||'')+'" class="layui-input"></div></div>'
-        +'<div class="layui-form-item"><label class="layui-form-label">Headers</label><div class="layui-input-block"><textarea id="f_headers" class="layui-textarea">'+(headers||'')+'</textarea></div></div>'
-        +'<div class="layui-form-item"><label class="layui-form-label">启用</label><div class="layui-input-block"><input type="checkbox" id="f_enabled" '+(enabled? 'checked':'' )+'></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">测试URL</label><div class="layui-input-block" style="display:flex;gap:8px"><input id="f_url_edit" placeholder="输入URL自动识别站点" class="layui-input"><button type="button" class="layui-btn layui-btn-primary" id="btnParseEdit">识别</button></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">站点</label><div class="layui-input-block"><input id="f_site_edit" value="'+(site||'')+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">标题XPath</label><div class="layui-input-block"><input id="f_title_xpath_edit" value="'+(title_xpath||'')+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">内容XPath</label><div class="layui-input-block"><input id="f_content_xpath_edit" value="'+(content_xpath||'')+'" class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">Headers</label><div class="layui-input-block"><textarea id="f_headers_edit" class="layui-textarea">'+(headers||'')+'</textarea></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">启用</label><div class="layui-input-block"><input type="checkbox" id="f_enabled_edit" '+(enabled? 'checked':'' )+'></div></div>'
         +'</div>';
-      layer.open({type:1,title:'编辑规则',area:['700px','520px'],content:html,btn:['保存','取消'],yes:function(){
+      layer.open({type:1,title:'编辑规则',area:['700px','580px'],content:html,btn:['保存','取消'],
+        success: function(){
+          document.getElementById('btnParseEdit').addEventListener('click', function(){
+            var u = document.getElementById('f_url_edit').value.trim();
+            if(!u){ layer.msg('请先输入URL'); return; }
+            var fd = new FormData(); fd.append('url', u);
+            fetch('/admin/rules/parse_site', {method:'POST', body:fd})
+              .then(function(r){return r.json()})
+              .then(function(res){
+                 if(res.code===0){ 
+                   document.getElementById('f_site_edit').value = res.site; 
+                   layer.msg('识别成功: ' + res.site);
+                 } else {
+                   layer.msg(res.msg||'识别失败');
+                 }
+              });
+          });
+        },
+        yes:function(){
         var fd = new FormData();
-        fd.append('site', document.getElementById('f_site').value.trim());
-        fd.append('title_xpath', document.getElementById('f_title_xpath').value);
-        fd.append('content_xpath', document.getElementById('f_content_xpath').value);
-        fd.append('request_headers', document.getElementById('f_headers').value);
-        fd.append('enabled', document.getElementById('f_enabled').checked ? '1' : '0');
+        fd.append('site', document.getElementById('f_site_edit').value.trim());
+        fd.append('title_xpath', document.getElementById('f_title_xpath_edit').value);
+        fd.append('content_xpath', document.getElementById('f_content_xpath_edit').value);
+        fd.append('request_headers', document.getElementById('f_headers_edit').value);
+        fd.append('enabled', document.getElementById('f_enabled_edit').checked ? '1' : '0');
         fetch('/admin/rules/update/'+id, {method:'POST', body: fd})
           .then(function(r){return r.json();})
           .then(function(res){ if (res.code===0){ layer.msg('已保存'); setTimeout(function(){ location.reload(); }, 500);} else { layer.msg(res.msg||'失败'); } });

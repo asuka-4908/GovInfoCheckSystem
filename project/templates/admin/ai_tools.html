@@ -6,16 +6,20 @@
     <div class="layui-card" style="height: calc(100vh - 110px); display: flex; flex-direction: column;">
       <div class="layui-card-header">
         AI数据清洗与分析
-        <div class="layui-form" style="float: right; width: 220px; margin-top: 2px;">
-          <select id="engineSelect">
-            {% if engines %}
-              {% for e in engines %}
-              <option value="{{ e.id }}">{{ e.provider_name }} - {{ e.model_name }}</option>
-              {% endfor %}
-            {% else %}
-              <option value="">请先配置并启用引擎</option>
-            {% endif %}
-          </select>
+        <div class="layui-form" style="float: right; display:flex; gap:10px; align-items:center; margin-top: 2px;">
+          <button class="layui-btn layui-btn-sm layui-btn-primary" id="btnHistory"><i class="layui-icon layui-icon-time"></i> 历史</button>
+          <button class="layui-btn layui-btn-sm layui-btn-primary" id="btnClearChat"><i class="layui-icon layui-icon-delete"></i> 清空</button>
+          <div style="width: 220px;">
+            <select id="engineSelect">
+              {% if engines %}
+                {% for e in engines %}
+                <option value="{{ e.id }}">{{ e.provider_name }} - {{ e.model_name }}</option>
+                {% endfor %}
+              {% else %}
+                <option value="">请先配置并启用引擎</option>
+              {% endif %}
+            </select>
+          </div>
         </div>
       </div>
       <div class="layui-card-body" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
@@ -163,6 +167,145 @@ layui.use(['layer', 'form'], function(){
     if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); sendPrompt(); }
   });
   document.getElementById('btnStop').addEventListener('click', function(){ try{ currentES && currentES.close(); }catch(e){} try{ lastTyping && lastTyping.remove(); }catch(e){} });
+
+  // --- History & Persistence Logic ---
+  var STORAGE_KEY_CURRENT = 'ai_chat_current';
+  var STORAGE_KEY_ARCHIVES = 'ai_chat_archives';
+
+  function saveState() {
+    var msgs = [];
+    document.querySelectorAll('#chatList .chat-msg').forEach(function(el){
+      var role = el.classList.contains('user') ? 'user' : 'ai';
+      var body = el.querySelector('.msg-body');
+      if(body) msgs.push({role: role, content: body.innerHTML}); 
+    });
+    localStorage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(msgs));
+  }
+
+  // Debounce save
+  var saveTimer;
+  var observer = new MutationObserver(function(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveState, 1000);
+  });
+  observer.observe(document.getElementById('chatList'), {childList: true, subtree: true, characterData: true});
+
+  function loadState() {
+    var raw = localStorage.getItem(STORAGE_KEY_CURRENT);
+    if(!raw) return;
+    try {
+      var msgs = JSON.parse(raw);
+      var list = document.getElementById('chatList');
+      list.innerHTML = ''; 
+      msgs.forEach(function(m){
+        var item = document.createElement('div');
+        item.className = 'chat-msg ' + m.role;
+        var ava = m.role === 'user' ? '我' : 'AI';
+        item.innerHTML = '<div class="role-ava">'+ava+'</div><div class="msg-body">'+m.content+'</div>';
+        list.appendChild(item);
+      });
+      if(list.lastChild) list.lastChild.scrollIntoView();
+    } catch(e){ console.error(e); }
+  }
+
+  // Load on init
+  loadState();
+
+  // Archive
+  function addToArchive() {
+    var raw = localStorage.getItem(STORAGE_KEY_CURRENT);
+    if(!raw || raw === '[]') return;
+    try {
+      var msgs = JSON.parse(raw);
+      if(msgs.length === 0) return;
+      var archives = JSON.parse(localStorage.getItem(STORAGE_KEY_ARCHIVES) || '[]');
+      var summary = '无标题对话';
+      var first = msgs.find(function(m){ return m.role === 'user'; });
+      if(first) {
+        var tmp = document.createElement('div'); tmp.innerHTML = first.content;
+        summary = tmp.textContent.substring(0, 30);
+      }
+      archives.unshift({
+        id: new Date().getTime(),
+        time: new Date().toLocaleString(),
+        summary: summary,
+        messages: msgs
+      });
+      localStorage.setItem(STORAGE_KEY_ARCHIVES, JSON.stringify(archives));
+    } catch(e){}
+  }
+
+  document.getElementById('btnClearChat').addEventListener('click', function(){
+    layer.confirm('确定清空当前对话吗？<br><small>建议先手动保存到历史记录，或者选择"归档并清空"</small>', {
+      btn: ['归档并清空', '仅清空', '取消']
+    }, function(index){
+      addToArchive();
+      document.getElementById('chatList').innerHTML = '';
+      localStorage.removeItem(STORAGE_KEY_CURRENT);
+      layer.close(index);
+      layer.msg('已归档并清空');
+    }, function(index){
+      document.getElementById('chatList').innerHTML = '';
+      localStorage.removeItem(STORAGE_KEY_CURRENT);
+      layer.close(index);
+      layer.msg('已清空');
+    });
+  });
+
+  document.getElementById('btnHistory').addEventListener('click', function(){
+    var archives = [];
+    try { archives = JSON.parse(localStorage.getItem(STORAGE_KEY_ARCHIVES) || '[]'); } catch(e){}
+    
+    var html = '<div style="padding:15px"><ul class="layui-timeline">';
+    if(archives.length === 0) {
+      html += '<li class="layui-timeline-item"><i class="layui-icon layui-timeline-axis">&#xe63f;</i><div class="layui-timeline-content layui-text-top">暂无历史记录</div></li>';
+    } else {
+      archives.forEach(function(a){
+        html += '<li class="layui-timeline-item"><i class="layui-icon layui-timeline-axis">&#xe63f;</i><div class="layui-timeline-content layui-text-top">';
+        html += '<h3 style="font-size:14px; margin-bottom:5px">'+a.time+'</h3>';
+        html += '<p style="color:#666; margin-bottom:8px; display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+(a.summary||'无内容')+'</p>';
+        html += '<div class="layui-btn-group">';
+        html += '<button class="layui-btn layui-btn-xs layui-btn-primary btn-load-hist" data-id="'+a.id+'">加载</button>';
+        html += '<button class="layui-btn layui-btn-xs layui-btn-danger btn-del-hist" data-id="'+a.id+'">删除</button>';
+        html += '</div></div></li>';
+      });
+    }
+    html += '</ul><div style="text-align:center;margin-top:20px"><button class="layui-btn layui-btn-sm layui-btn-danger" id="btnClearAllHist">清空所有记录</button></div></div>';
+
+    layer.open({
+      type: 1,
+      title: '历史对话记录',
+      area: ['350px', '100%'],
+      offset: 'r',
+      shadeClose: true,
+      anim: 2,
+      content: html,
+      success: function(layero, index){
+        layero.find('.btn-load-hist').on('click', function(){
+          var id = parseInt(this.dataset.id);
+          var item = archives.find(function(a){ return a.id === id; });
+          if(item) {
+            localStorage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(item.messages));
+            loadState();
+            layer.close(index);
+            layer.msg('已加载历史对话');
+          }
+        });
+        layero.find('.btn-del-hist').on('click', function(){
+          var id = parseInt(this.dataset.id);
+          archives = archives.filter(function(a){ return a.id !== id; });
+          localStorage.setItem(STORAGE_KEY_ARCHIVES, JSON.stringify(archives));
+          layer.close(index);
+          document.getElementById('btnHistory').click(); 
+        });
+        layero.find('#btnClearAllHist').on('click', function(){
+          localStorage.removeItem(STORAGE_KEY_ARCHIVES);
+          layer.close(index);
+          layer.msg('所有历史记录已清空');
+        });
+      }
+    });
+  });
 });
 </script>
 <style>
