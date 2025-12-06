@@ -1,10 +1,69 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
-from werkzeug.security import check_password_hash
-from .db import query_one
+from werkzeug.security import check_password_hash, generate_password_hash
+from .db import query_one, execute_update
 from .models import User
 
 bp = Blueprint('auth', __name__)
+
+@bp.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.index'))
+
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+
+        if not username or not password:
+            flash('用户名和密码不能为空', 'error')
+            return render_template('register.html')
+            
+        if password != confirm_password:
+            flash('两次密码输入不一致', 'error')
+            return render_template('register.html')
+
+        existing = query_one("select id from users where username = ?", [username])
+        if existing:
+            flash('用户名已存在', 'error')
+            return render_template('register.html')
+
+        # Default role 'user'
+        user_role = query_one("select id from roles where name = 'user'")
+        if not user_role:
+            # Fallback if 'user' role doesn't exist, try 'admin' or create 'user'
+            # For now assume 'user' role exists as per seed logic
+            flash('系统错误：无法分配角色', 'error')
+            return render_template('register.html')
+            
+        pwd_hash = generate_password_hash(password)
+        execute_update(
+            "insert into users(username, password_hash, role_id) values(?, ?, ?)",
+            [username, pwd_hash, user_role['id']]
+        )
+        flash('注册成功，请登录', 'success') # success category might not be styled in login.html but that's fine for now, we can check login.html
+        return redirect(url_for('auth.login'))
+
+    return render_template('register.html')
+
+@bp.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    if request.method == 'POST':
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not password or not confirm_password:
+            flash('请输入新密码', 'error')
+        elif password != confirm_password:
+            flash('两次密码不一致', 'error')
+        else:
+            pwd_hash = generate_password_hash(password)
+            execute_update("update users set password_hash = ? where id = ?", [pwd_hash, current_user.id])
+            flash('密码修改成功', 'success')
+            
+    return render_template('profile.html')
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():

@@ -2,12 +2,12 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>登录 - GovBiz Monitor AI</title>
+    <title>注册 - GovBiz Monitor AI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="{{ url_for('static', filename='layui-v2.13.2/layui/css/layui.css') }}">
     <style>
         body { background-color: #f2f2f2; }
-        .login-main { width: 375px; margin: 0 auto; margin-top: 100px; background: #fff; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); border-radius: 4px; }
+        .login-main { width: 375px; margin: 0 auto; margin-top: 50px; background: #fff; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); border-radius: 4px; }
         .login-header { text-align: center; padding: 20px 0; }
         .login-header h2 { font-size: 24px; color: #333; font-weight: 500; }
     </style>
@@ -16,7 +16,7 @@
     <div class="login-main">
         <div class="login-header">
             <h2>{{ settings.app_name }}</h2>
-            <p>舆情洞察系统</p>
+            <p>用户注册</p>
         </div>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -26,16 +26,12 @@
               <div class="layui-alert layui-bg-red" style="margin-bottom: 15px; padding: 10px; color: #fff; text-align: center;">
                 {{ message }}
               </div>
-              {% elif category == 'success' %}
-              <div class="layui-alert layui-bg-green" style="margin-bottom: 15px; padding: 10px; color: #fff; text-align: center;">
-                {{ message }}
-              </div>
               {% endif %}
             {% endfor %}
           {% endif %}
         {% endwith %}
 
-        <form class="layui-form" action="{{ url_for('auth.login') }}" method="post">
+        <form class="layui-form" action="{{ url_for('auth.register') }}" method="post">
             <div class="layui-form-item">
                 <label class="layui-icon layui-icon-username" for="username"></label>
                 <input type="text" name="username" id="username" lay-verify="required" placeholder="用户名" autocomplete="off" class="layui-input" style="padding-left: 38px;">
@@ -44,11 +40,15 @@
                 <label class="layui-icon layui-icon-password" for="password"></label>
                 <input type="password" name="password" id="password" lay-verify="required" placeholder="密码" autocomplete="off" class="layui-input" style="padding-left: 38px;">
             </div>
+            <div class="layui-form-item" style="position: relative;">
+                <label class="layui-icon layui-icon-password" for="confirm_password"></label>
+                <input type="password" name="confirm_password" id="confirm_password" lay-verify="required" placeholder="确认密码" autocomplete="off" class="layui-input" style="padding-left: 38px;">
+            </div>
             <div class="layui-form-item">
-                <button class="layui-btn layui-btn-fluid" lay-submit lay-filter="login">登 录</button>
+                <button class="layui-btn layui-btn-fluid" lay-submit lay-filter="register">注 册</button>
             </div>
             <div class="layui-form-item" style="text-align: right;">
-                <a href="{{ url_for('auth.register') }}" style="color: #009688;">没有账号？立即注册</a>
+                <a href="{{ url_for('auth.login') }}" style="color: #009688;">已有账号？立即登录</a>
             </div>
         </form>
     </div>
@@ -59,10 +59,14 @@
             var form = layui.form;
             var layer = layui.layer;
             
-            // 登录表单提交
-            form.on('submit(login)', function(data){
-                // 可以在这里做loading效果
-                // layer.msg('登录中...', {icon: 16, shade: 0.3, time: 0});
+            // 注册表单提交
+            form.on('submit(register)', function(data){
+                var password = data.field.password;
+                var confirm = data.field.confirm_password;
+                if(password !== confirm){
+                    layer.msg('两次密码输入不一致', {icon: 5});
+                    return false;
+                }
                 return true;
             });
         });
