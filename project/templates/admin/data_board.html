@@ -3,37 +3,92 @@
 {% block title %}数据大屏 - {{ settings.app_name }}{% endblock %}
 
 {% block content %}
-<div class="layui-row" style="gap: 15px;">
+<style>
+  .dashboard-card { border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .bg-dark-gradient { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #fff; }
+  .bg-dark-blue { background: #0b1b2b; color: #9cd0ff; }
+  .text-highlight { color: #00e5ff; }
+  .cell-clip { max-width: 340px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Scrollbar for dark theme */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: #1e2a38; }
+  ::-webkit-scrollbar-thumb { background: #3c4f65; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #4f6580; }
+  
+  /* Markdown Content Styles Fix for LayUI reset */
+  #aiAnalysisResult strong { font-weight: bold !important; color: #00e5ff; }
+  #aiAnalysisResult p { margin-bottom: 10px; }
+  #aiAnalysisResult ul { list-style-type: disc !important; padding-left: 20px; margin-bottom: 10px; }
+  #aiAnalysisResult li { list-style-type: disc !important; }
+  #aiAnalysisResult h1, #aiAnalysisResult h2, #aiAnalysisResult h3 { color: #fff; margin: 10px 0; font-weight: bold; }
+</style>
+
+<div class="layui-row layui-col-space15">
+  <!-- Left: Map (2D/3D) -->
   <div class="layui-col-md8">
-    <div class="layui-card" style="background: linear-gradient(135deg,#0f2027,#203a43,#2c5364); color:#fff;">
-      <div class="layui-card-header" style="color:#fff;">全国地区热力图</div>
-      <div class="layui-card-body" style="height:560px;">
-        <div id="chinaMap" style="width:100%;height:520px;"></div>
+    <div class="layui-card dashboard-card bg-dark-gradient">
+      <div class="layui-card-header" style="border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 16px; font-weight: bold;">全国舆情态势图</span>
+        <div class="layui-btn-group">
+           <button class="layui-btn layui-btn-xs layui-btn-primary" onclick="switchMap('2d')" id="btn2d">2D平面</button>
+           <button class="layui-btn layui-btn-xs layui-btn-normal" onclick="switchMap('3d')" id="btn3d">3D地球</button>
+        </div>
+      </div>
+      <div class="layui-card-body" style="height: 580px; padding: 0;">
+        <div id="chinaMap" style="width:100%; height:100%;"></div>
       </div>
     </div>
   </div>
+  
+  <!-- Right: Charts -->
   <div class="layui-col-md4">
-    <div class="layui-card" style="background:#0b1b2b;color:#9cd0ff;">
-      <div class="layui-card-header" style="color:#9cd0ff;">热点地区排行</div>
-      <div class="layui-card-body" style="height:560px;">
-        <div id="topRegions" style="width:100%;height:520px;"></div>
+    <!-- Top Regions -->
+    <div class="layui-card dashboard-card bg-dark-blue" style="margin-bottom: 15px;">
+      <div class="layui-card-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">热点地区排行</div>
+      <div class="layui-card-body" style="height: 270px;">
+        <div id="topRegions" style="width:100%; height:100%;"></div>
+      </div>
+    </div>
+    <!-- Source Pie Chart -->
+    <div class="layui-card dashboard-card bg-dark-blue">
+      <div class="layui-card-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">数据来源分布</div>
+      <div class="layui-card-body" style="height: 250px;">
+        <div id="sourcePie" style="width:100%; height:100%;"></div>
       </div>
     </div>
   </div>
 </div>
 
-<div class="layui-row" style="margin-top: 15px;">
+<!-- AI Analysis Row -->
+<div class="layui-row layui-col-space15">
   <div class="layui-col-md12">
-    <div class="layui-card">
-      <div class="layui-card-header">最新采集数据（20条）</div>
+    <div class="layui-card dashboard-card" style="background: #1e2a38; color: #e0e0e0;">
+      <div class="layui-card-header" style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #00e5ff;">
+        <i class="layui-icon layui-icon-engine"></i> AI 智能研判分析
+        <button class="layui-btn layui-btn-xs layui-btn-warm" style="float:right; margin-top:8px;" onclick="runAnalysis()" id="btnAnalyze">
+          <i class="layui-icon layui-icon-play"></i> 生成报告
+        </button>
+      </div>
+      <div class="layui-card-body" style="min-height: 100px; padding: 20px;">
+        <div id="aiAnalysisResult" style="font-size: 15px; line-height: 1.8;">点击右上角“生成报告”按钮，AI将为您自动分析当前数据态势...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Latest List Row -->
+<div class="layui-row layui-col-space15">
+  <div class="layui-col-md12">
+    <div class="layui-card dashboard-card">
+      <div class="layui-card-header">实时采集监测（最新20条）</div>
       <div class="layui-card-body">
-        <table class="layui-table">
+        <table class="layui-table" lay-skin="nob">
           <colgroup>
-            <col style="width:44px">
-            <col style="width:360px">
+            <col style="width:50px">
+            <col>
+            <col style="width:150px">
+            <col style="width:150px">
             <col style="width:160px">
-            <col style="width:160px">
-            <col style="width:120px">
           </colgroup>
           <thead>
             <tr>
@@ -41,7 +96,7 @@
               <th>标题</th>
               <th>来源</th>
               <th>关键词</th>
-              <th>时间</th>
+              <th>采集时间</th>
             </tr>
           </thead>
           <tbody id="latestTbody"></tbody>
@@ -53,70 +108,322 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://fastly.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="{{ url_for('static', filename='js/echarts.min.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/echarts-gl.min.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/marked.min.js') }}?v=2"></script>
 <script>
 (function(){
-  var mapEl = document.getElementById('chinaMap');
-  var topEl = document.getElementById('topRegions');
-  var latestTbody = document.getElementById('latestTbody');
-  var mapChart = echarts.init(mapEl);
-  var topChart = echarts.init(topEl);
-  function renderLatest(rows){
-    var html = '';
-    for(var i=0;i<rows.length;i++){
-      var r = rows[i];
-      var idx = i+1;
-      var title = (r.title||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      var src = (r.source||'');
-      var kw = (r.keyword||'');
-      var tm = (r.created_at||'');
-      html += '<tr>'+
-        '<td>'+idx+'</td>'+
-        '<td><div class="cell-clip"><a href="'+(r.url||'#')+'" target="_blank" rel="noopener noreferrer">'+title+'</a></div></td>'+
-        '<td>'+src+'</td>'+
-        '<td>'+kw+'</td>'+
-        '<td>'+tm+'</td>'+
-      '</tr>';
+  // Ensure libraries are loaded
+  if (typeof echarts === 'undefined') { console.error('ECharts not loaded'); }
+  if (typeof marked === 'undefined') { console.error('Marked not loaded'); }
+
+  var mapChart = echarts.init(document.getElementById('chinaMap'));
+  var topChart = echarts.init(document.getElementById('topRegions'));
+  var pieChart = echarts.init(document.getElementById('sourcePie'));
+  var currentMapType = '2d';
+  var globalData = { map: [], sources: [] };
+
+  window.switchMap = function(type) {
+    currentMapType = type;
+    document.getElementById('btn2d').className = type === '2d' ? 'layui-btn layui-btn-xs layui-btn-normal' : 'layui-btn layui-btn-xs layui-btn-primary';
+    document.getElementById('btn3d').className = type === '3d' ? 'layui-btn layui-btn-xs layui-btn-normal' : 'layui-btn layui-btn-xs layui-btn-primary';
+    renderMap();
+  };
+
+  window.runAnalysis = function() {
+    var btn = document.getElementById('btnAnalyze');
+    var box = document.getElementById('aiAnalysisResult');
+    if(btn.classList.contains('layui-btn-disabled')) return;
+    
+    btn.classList.add('layui-btn-disabled');
+    btn.innerHTML = '<i class="layui-icon layui-icon-loading layui-icon layui-anim layui-anim-rotate layui-anim-loop"></i> 分析中...';
+    box.innerHTML = '正在请求AI大模型进行深度分析，请稍候...';
+    
+    fetch('/admin/data_board/analyze', {method: 'POST'})
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if(res.code === 0) {
+          // Parse Markdown and display directly
+          box.innerHTML = marked.parse(res.data || 'AI未返回有效内容。');
+        } else {
+          box.innerHTML = '<span style="color: #ff5722;">分析失败: ' + (res.msg || '未知错误') + '</span>';
+        }
+      })
+      .catch(function(e){
+        box.innerHTML = '<span style="color: #ff5722;">网络请求错误</span>';
+      })
+      .finally(function(){
+        btn.classList.remove('layui-btn-disabled');
+        btn.innerHTML = '<i class="layui-icon layui-icon-play"></i> 重新分析';
+      });
+  };
+
+  // Removed typeWriter function as it conflicts with HTML rendering from Markdown
+  
+  function renderMap() {
+    var mapData = globalData.map || [];
+    var maxVal = 0;
+    mapData.forEach(function(d){ if(d.value > maxVal) maxVal = d.value; });
+    if(maxVal === 0) maxVal = 10;
+
+    var option = {};
+    if (currentMapType === '2d') {
+      option = {
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'item' },
+        visualMap: {
+          min: 0, max: maxVal,
+          left: 'left', top: 'bottom',
+          text: ['高', '低'],
+          calculable: true,
+          inRange: { color: ['#73c0de','#3ba272','#fc8452','#d7000f'] },
+          textStyle: { color: '#fff' }
+        },
+        geo: {
+          map: 'china',
+          roam: true,
+          label: { emphasis: { show: true, color: '#fff' } },
+          itemStyle: {
+            normal: { areaColor: '#323c48', borderColor: '#111' },
+            emphasis: { areaColor: '#2a333d' }
+          }
+        },
+        series: [{
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          data: mapData.map(function(item) {
+             // Convert name to coord if needed, but simple map series works better for regions
+             return item; 
+          })
+        }, {
+            type: 'map',
+            map: 'china',
+            geoIndex: 0,
+            aspectScale: 0.75,
+            tooltip: { show: true },
+            label: { normal: { show: false }, emphasis: { show: true, textStyle: { color: '#fff' } } },
+            roam: true,
+            itemStyle: {
+                normal: { areaColor: '#0f2b47', borderColor: '#175f8c' },
+                emphasis: { areaColor: '#1b5d86' }
+            },
+            data: mapData
+        }]
+      };
+    } else {
+      // 3D Map
+      option = {
+        backgroundColor: 'transparent',
+        visualMap: {
+          show: false,
+          min: 0, max: maxVal,
+          inRange: { color: ['#73c0de','#3ba272','#fc8452','#d7000f'] }
+        },
+        geo3D: {
+          map: 'china',
+          roam: true,
+          itemStyle: {
+            color: '#1d5e98',
+            opacity: 1,
+            borderWidth: 0.4,
+            borderColor: '#000'
+          },
+          label: {
+            show: true,
+            textStyle: { color: '#fff', fontSize: 10, backgroundColor: 'rgba(0,0,0,0)' }
+          },
+          emphasis: {
+            label: { show: true },
+            itemStyle: { color: '#ffeb3b' }
+          },
+          light: {
+            main: { intensity: 1, shadow: true, shadowQuality: 'high' },
+            ambient: { intensity: 0.3 }
+          },
+          viewControl: {
+            distance: 100,
+            alpha: 30,
+            beta: 0
+          }
+        },
+        series: [{
+          type: 'bar3D',
+          coordinateSystem: 'geo3D',
+          data: mapData.map(function(item){
+             // We need coordinates for bar3D. 
+             // Since we don't have a coord map loaded easily, let's use map3D (region color) instead of bars for simplicity
+             // Or better: just use map3D (choropleth in 3D)
+             return item;
+          })
+        }]
+      };
+      // Use map3D logic: region color based on value
+      option.series = [{
+          type: 'map3D',
+          map: 'china',
+          coordinateSystem: 'geo3D', // Not needed for map3D
+          itemStyle: {
+             color: '#1d5e98'
+          },
+          label: { show: false },
+          data: mapData.map(function(item){
+              return { name: item.name, value: item.value, itemStyle: { color: null } }; // Let visualMap handle color
+          })
+      }];
+      // Actually geo3D is the component, series can be empty if we just color the geo3D regions?
+      // No, standard way for choropleth 3D is series: [{type: 'map3D'}]
+      option = {
+        backgroundColor: 'transparent',
+        visualMap: {
+          min: 0, max: maxVal,
+          show: true,
+          left: 'left', top: 'bottom',
+          text: ['高', '低'],
+          inRange: { color: ['#73c0de','#3ba272','#fc8452','#d7000f'] },
+          textStyle: { color: '#fff' }
+        },
+        series: [{
+            type: 'map3D',
+            map: 'china',
+            name: 'china',
+            regionHeight: 2,
+            itemStyle: {
+                color: '#1d5e98',
+                opacity: 1,
+                borderWidth: 0.4,
+                borderColor: '#000'
+            },
+            label: {
+                show: false,
+                textStyle: { color: '#fff', fontSize: 10 }
+            },
+            emphasis: {
+                label: { show: true },
+                itemStyle: { color: '#ffeb3b' }
+            },
+            light: {
+                main: { intensity: 1.2, shadow: true },
+                ambient: { intensity: 0.3 }
+            },
+            viewControl: {
+                distance: 100,
+                alpha: 40,
+                beta: 0,
+                autoRotate: true
+            },
+            data: mapData
+        }]
+      };
     }
-    latestTbody.innerHTML = html;
+    mapChart.setOption(option, true);
   }
+
+  function renderCharts(res) {
+    // Top Regions Bar
+    var regions = (res.map||[]).slice().sort(function(a,b){return (b.value||0)-(a.value||0);}).slice(0,10);
+    var names = regions.map(function(x){return x.name});
+    var vals = regions.map(function(x){return x.value});
+    
+    topChart.setOption({
+      backgroundColor: 'transparent',
+      grid: { left: 40, right: 20, top: 30, bottom: 30 },
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: names, axisLabel: { color: '#9cd0ff', interval: 0, rotate: 30 } },
+      yAxis: { type: 'value', axisLabel: { color: '#9cd0ff' }, splitLine: { lineStyle: { color: '#333' } } },
+      series: [{
+        type: 'bar',
+        data: vals,
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#5fb878'},{offset:1,color:'#1E9FFF'}])
+        },
+        barWidth: '40%'
+      }]
+    });
+
+    // Source Pie
+    var sources = res.sources || [];
+    pieChart.setOption({
+      backgroundColor: 'transparent',
+      tooltip: { trigger: 'item' },
+      legend: { orient: 'vertical', right: 10, top: 'center', textStyle: { color: '#9cd0ff' } },
+      series: [{
+        name: '数据来源',
+        type: 'pie',
+        radius: ['40%', '70%'],
+        center: ['35%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 5,
+          borderColor: '#0b1b2b',
+          borderWidth: 2
+        },
+        label: { show: false, position: 'center' },
+        emphasis: {
+          label: { show: true, fontSize: '18', fontWeight: 'bold', color: '#fff' }
+        },
+        labelLine: { show: false },
+        data: sources
+      }]
+    });
+  }
+
   function loadLatest(){
     fetch('/admin/data_board/latest').then(function(r){return r.json();}).then(function(res){
-      if(res.code===0){ renderLatest(res.rows||[]); }
+      if(res.code===0){ 
+        var rows = res.rows||[];
+        var html = '';
+        for(var i=0;i<rows.length;i++){
+          var r = rows[i];
+          html += '<tr>'+
+            '<td>'+(i+1)+'</td>'+
+            '<td><div class="cell-clip"><a href="'+(r.url||'#')+'" target="_blank" style="color:#fff;">'+(r.title||'')+'</a></div></td>'+
+            '<td>'+(r.source||'')+'</td>'+
+            '<td>'+(r.keyword||'')+'</td>'+
+            '<td>'+(r.created_at||'')+'</td>'+
+          '</tr>';
+        }
+        document.getElementById('latestTbody').innerHTML = html;
+      }
     });
   }
-  function loadMap(){
-    fetch('https://fastly.jsdelivr.net/npm/echarts@5/map/json/china.json').then(function(r){return r.json();}).then(function(chinaJson){
+
+  function loadMapData(){
+    fetch('/admin/data_board/heatmap').then(function(r){return r.json();}).then(function(res){
+      if(res.code===0){
+        globalData = res;
+        renderMap();
+        renderCharts(res);
+      }
+    });
+  }
+
+  // Init
+  fetch("{{ url_for('static', filename='map/china.json') }}")
+    .then(function(r){return r.json();})
+    .then(function(chinaJson){
       echarts.registerMap('china', chinaJson);
-      fetch('/admin/data_board/heatmap').then(function(r){return r.json();}).then(function(res){
-        if(res.code!==0) return;
-        var mapData = res.map||[];
-        var regions = (mapData||[]).slice().sort(function(a,b){return (b.value||0)-(a.value||0);}).slice(0,10);
-        var names = regions.map(function(x){return x.name});
-        var vals = regions.map(function(x){return x.value});
-        var mapOpt = {
-          backgroundColor: 'transparent',
-          tooltip: { trigger: 'item' },
-          visualMap: { min: 0, max: Math.max.apply(null, vals.concat([10])), left: 'left', top: 'bottom', text: ['高','低'], calculable: true, inRange: { color: ['#73c0de','#3ba272','#fc8452','#d7000f'] } },
-          series: [{ type: 'map', map: 'china', roam: true, label: { show: false }, itemStyle: { areaColor: '#0f2b47', borderColor: '#175f8c' }, emphasis: { label: { show: true }, itemStyle: { areaColor: '#1b5d86' } }, data: mapData }]
-        };
-        var barOpt = {
-          backgroundColor: 'transparent',
-          grid: { left: 30, right: 16, top: 24, bottom: 38 },
-          xAxis: { type: 'category', data: names, axisLabel: { color: '#9cd0ff' } },
-          yAxis: { type: 'value', axisLabel: { color: '#9cd0ff' } },
-          tooltip: { trigger: 'axis' },
-          series: [{ type: 'bar', data: vals, itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#5fb878'},{offset:.7,color:'#38a39a'},{offset:1,color:'#1E9FFF'}]) } }]
-        };
-        mapChart.setOption(mapOpt);
-        topChart.setOption(barOpt);
-      });
+      loadMapData();
+    })
+    .catch(function(e){
+      console.error('Map load failed:', e);
+      // Fallback or alert?
     });
-  }
+
   loadLatest();
-  loadMap();
-  setInterval(function(){ loadLatest(); loadMap(); }, 60000);
+  
+  // Auto refresh
+  setInterval(function(){
+    loadLatest();
+    loadMapData();
+  }, 60000);
+
+  // Resize
+  window.addEventListener('resize', function(){
+    mapChart.resize();
+    topChart.resize();
+    pieChart.resize();
+  });
+
 })();
 </script>
 {% endblock %}
-

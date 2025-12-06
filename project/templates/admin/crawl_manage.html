@@ -16,11 +16,12 @@
             #crawlbar .layui-btn{height:36px;line-height:36px;padding:0 16px}
             #resultsWrap{max-height:calc(100vh - 260px);overflow:auto}
             #results{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}
-            .result-card .layui-card{height:360px;display:flex;flex-direction:column}
+            .result-card .layui-card{height:300px;display:flex;flex-direction:column}
             .result-card .layui-card-body{display:flex;flex-direction:column}
             .result-card .layui-card-body img{width:100%;height:180px;object-fit:cover;border-radius:6px}
-            .result-card .title{margin-top:8px;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-            .result-card .card-actions{margin-top:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+            .result-card .title{margin-top:8px;font-weight:600;line-height:20px;height:40px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+            .result-card .card-actions{margin-top:auto;display:flex;align-items:center;gap:4px;flex-wrap:nowrap;justify-content:space-between}
+            .result-card .card-actions .layui-btn{padding:0 8px;margin:0}
           </style>
           <div id="crawlbar" class="layui-form-item" style="display:flex;align-items:center;gap:16px;flex-wrap:nowrap">
             <div class="layui-inline" style="width:280px;display:flex;align-items:center">
@@ -138,14 +139,14 @@
         } else if (cover) {
           coverBlock = '<img src="' + cover + '" onerror="this.onerror=null;this.src=\'' + defaultImg + '\'"/>';
         } else if (url) {
-          coverBlock = '<a href="' + url + '" target="_blank"><img src="' + defaultImg + '" style="object-fit:contain;background:#f5f7fa"/></a>';
+          coverBlock = '<a href="' + url + '" target="_blank"><img src="' + defaultImg + '"/></a>';
         } else {
-          coverBlock = '<img src="' + defaultImg + '" style="object-fit:contain;background:#f5f7fa"/>';
+          coverBlock = '<img src="' + defaultImg + '"/>';
         }
         var title = it['标题'] || '';
         var source = it['来源'] || '';
         var status = it.deep_done ? '<span class="status-badge status-ok">已</span>' : '<span class="status-badge status-no">未</span>';
-        var checkbox = '<input type="checkbox" class="sel-item" data-index="' + idx + '" style="margin-right:8px">';
+        var checkbox = '<input type="checkbox" class="sel-item" data-index="' + idx + '">';
         body.innerHTML = coverBlock + '<div class="title"><a href="' + url + '" target="_blank">' + title + '</a></div>' + '<div style="color:#999;margin-top:4px">' + source + '</div>' + '<div class="card-actions">' + status + '<button class="layui-btn layui-btn-sm" data-action="deep" data-index="' + idx + '"><i class="layui-icon layui-icon-search"></i>深度采集</button><button class="layui-btn layui-btn-sm layui-btn-normal" data-action="saveOne" data-index="' + idx + '"><i class="layui-icon layui-icon-form"></i>单条入库</button>' + checkbox + '</div>';
         card.appendChild(body);
         col.appendChild(card);

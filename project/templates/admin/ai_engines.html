@@ -61,6 +61,7 @@
 <script>
 layui.use(['layer','form'], function(){
   var layer = layui.layer;
+  var form = layui.form;
   document.getElementById('btnSearch').addEventListener('click', function(){
     var q = document.getElementById('q').value.trim();
     location.href = '/admin/ai_engines?q=' + encodeURIComponent(q);
@@ -95,14 +96,16 @@ layui.use(['layer','form'], function(){
       var model = card.querySelector('.engine-model').textContent.trim();
       var url = card.querySelector('.engine-body .engine-field span').getAttribute('title');
       var enVal = card.getAttribute('data-enabled') === '1';
-      var html = '<div style="padding:12px">'
+      var html = '<div class="layui-form" style="padding:12px" lay-filter="edit_engine">'
         +'<div class="layui-form-item"><label class="layui-form-label">服务商</label><div class="layui-input-block"><input id="f_provider" value="'+provider+'" class="layui-input"></div></div>'
         +'<div class="layui-form-item"><label class="layui-form-label">API URL</label><div class="layui-input-block"><input id="f_url" value="'+(url||'')+'" class="layui-input"></div></div>'
         +'<div class="layui-form-item"><label class="layui-form-label">API Key</label><div class="layui-input-block"><input id="f_key" class="layui-input" type="password" placeholder="留空不变"></div></div>'
         +'<div class="layui-form-item"><label class="layui-form-label">模型</label><div class="layui-input-block"><input id="f_model" value="'+model+'" class="layui-input"></div></div>'
-        +'<div class="layui-form-item"><label class="layui-form-label">启用</label><div class="layui-input-block"><input type="checkbox" id="f_enabled" '+(enVal?'checked':'')+' class="layui-input"></div></div>'
+        +'<div class="layui-form-item"><label class="layui-form-label">启用</label><div class="layui-input-block"><input type="checkbox" id="f_enabled" '+(enVal?'checked':'')+' lay-skin="switch" lay-text="启用|停用"></div></div>'
         +'</div>';
-      layer.open({type:1,title:'编辑引擎',area:['520px','460px'],content:html,btn:['保存','取消'],yes:function(){
+      layer.open({type:1,title:'编辑引擎',area:['520px','460px'],content:html,btn:['保存','取消'],
+      success: function(){ form.render(null, 'edit_engine'); },
+      yes:function(){
         var fd = new FormData();
         fd.append('provider_name', document.getElementById('f_provider').value.trim());
         fd.append('api_url', document.getElementById('f_url').value.trim());

@@ -223,8 +223,9 @@ body {
 .chat-list{display:flex;flex-direction:column;gap:12px;max-height:52vh;overflow:auto;padding:6px}
 .chat-msg{display:flex;gap:10px;align-items:flex-start}
 .chat-msg .role-ava{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;background:linear-gradient(90deg,#7c8db5,#38a39a)}
+.chat-msg.user {flex-direction:row-reverse}
 .chat-msg.user .role-ava{background:linear-gradient(90deg,#5f76e8,#38a39a)}
-.chat-msg .msg-body{flex:1;border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#f9fafc}
+.chat-msg .msg-body{max-width:80%;width:fit-content;border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#f9fafc;word-break:break-word}
 .chat-msg.ai .msg-body{background:#ffffff}
 .chat-tools{display:flex;gap:8px;margin-top:6px}
 .typing{display:inline-block;min-width:28px}

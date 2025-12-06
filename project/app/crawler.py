@@ -135,6 +135,8 @@ def collect_baidu_items(keyword, count):
                 continue
             if key:
                 seen.add(key)
+            if not it.get('来源'):
+                it['来源'] = '百度'
             out.append(it)
             added_in_page += 1
             if len(out) >= count:
@@ -250,6 +252,9 @@ def fetch_items_for_keyword(keyword):
         params2 = {'word': keyword, 'tn': 'news', 'from': 'news'}
         resp2 = requests.get(url2, params=params2, headers=headers, timeout=10, proxies=proxies or None, allow_redirects=True)
         items = parse_news_items(resp2.text)
+    for it in items:
+        if not it.get('来源'):
+            it['来源'] = '百度'
     return items
 
 def save_items_for_keyword(keyword, items):
