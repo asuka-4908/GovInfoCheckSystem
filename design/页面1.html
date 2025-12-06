@@ -1,0 +1,595 @@
+<html lang='zh-CN'>
+        <head >
+        <meta charset='UTF-8'/>
+<meta name='viewport' content='width=device-width, initial-scale=1.0'/>
+<title >局域网聊天室</title>
+<script src='https://res.gemcoder.com/js/reload.js'></script>
+<script src='https://cdn.tailwindcss.com'></script>
+<link href='https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css' rel='stylesheet'/>
+<script >tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        primary: '#2563eb',
+        secondary: '#4f46e5',
+        success: '#10b981',
+        warning: '#f59e0b',
+        danger: '#ef4444',
+        info: '#3b82f6',
+        light: '#f3f4f6',
+        dark: '#1f2937',
+        'chat-bg': '#e5ddd5',
+        'chat-bubble-left': '#ffffff',
+        'chat-bubble-right': '#dcf8c6',
+        'sidebar-bg': '#f8f9fa',
+        'active-chat': '#e9ecef',
+        'search-bar': '#e9ecef'
+      },
+      spacing: {
+        '128': '32rem',
+        '144': '36rem'
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif']
+      }
+    }
+  }
+};</script>
+<style type='text/tailwindcss'>
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .chat-bubble-left {
+                border-radius: 18px 18px 18px 0;
+            }
+            .chat-bubble-right {
+                border-radius: 18px 18px 0 18px;
+            }
+            .sidebar-shadow {
+                box-shadow: 1px 0 3px rgba(0, 0, 0, 0.1);
+            }
+            .message-time {
+                font-size: 0.65rem;
+                opacity: 0.7;
+            }
+        }
+    </style>
+    </head>
+<body class='bg-gray-100 h-screen flex overflow-hidden text-gray-800 font-sans'>
+        <!-- [MODULE] a1b_主内容区域 -->
+<div class='flex flex-col md:flex-row w-full h-full max-w-7xl mx-auto bg-white shadow-lg overflow-hidden'>
+        <!-- [MODULE] c3d_侧边栏 -->
+<div class='w-full md:w-80 flex flex-col h-full border-r border-gray-200 bg-sidebar-bg sidebar-shadow z-10'>
+        <!-- [MODULE] e5f_侧边栏:顶部工具栏 -->
+<div class='flex items-center justify-between p-3 border-b border-gray-200 bg-white'>
+        <div class='flex items-center space-x-3'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/4ae69e828197fb219ea2a639679f6e57.png' alt='用户头像' class='w-10 h-10 rounded-full object-cover border-2 border-primary'/>
+<div >
+        <h2 class='font-semibold text-gray-800'>
+        我的聊天室
+    </h2>
+<div class='flex items-center text-xs text-success'>
+        <span class='w-2 h-2 bg-success rounded-full mr-1'>
+        </span>
+<span >
+        在线
+    </span>
+    </div>
+    </div>
+    </div>
+<div class='flex space-x-2'>
+        <button class='w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors' title='添加好友'>
+        <i class='fas fa-plus text-gray-600'>
+        </i>
+    </button>
+<button class='w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors' title='设置'>
+        <i class='fas fa-cog text-gray-600'>
+        </i>
+    </button>
+    </div>
+    </div>
+<!-- [/MODULE] e5f_侧边栏:顶部工具栏 -- 包含用户头像、聊天室标题、在线状态、添加好友按钮和设置按钮 -->
+<!-- [MODULE] g7h_侧边栏:搜索框 -->
+<div class='p-3 border-b border-gray-200 bg-white'>
+        <div class='relative'>
+        <input type='text' placeholder='搜索聊天、联系人...' class='w-full py-2 pl-10 pr-4 rounded-full bg-search-bar focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all'/>
+<i class='fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400'>
+        </i>
+    </div>
+    </div>
+<!-- [/MODULE] g7h_侧边栏:搜索框 -- 用于搜索聊天和联系人的输入框 -->
+<!-- [MODULE] i9j_侧边栏:聊天列表 -->
+<div class='flex-1 overflow-y-auto scrollbar-hide'>
+        <!-- 活跃聊天 -->
+<div class='chat-item active flex items-center p-3 bg-active-chat border-l-4 border-primary cursor-pointer hover:bg-gray-100 transition-colors'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/b6bcb2b7c5748b60367007a6bbc2b860.png' alt='好友头像' class='w-12 h-12 rounded-full object-cover mr-3'/>
+<div class='flex-1 min-w-0'>
+        <div class='flex justify-between items-center mb-1'>
+        <h3 class='font-medium text-gray-800 truncate'>
+        张三
+    </h3>
+<span class='text-xs text-gray-500'>
+        14:30
+    </span>
+    </div>
+<p class='text-sm text-gray-600 truncate flex items-center'>
+        <i class='fas fa-check-circle text-primary mr-1 text-xs'>
+        </i>
+<span >
+        好的，我明白了！
+    </span>
+    </p>
+    </div>
+    </div>
+<!-- 未读消息聊天 -->
+<div class='chat-item flex items-center p-3 cursor-pointer hover:bg-gray-100 transition-colors'>
+        <div class='relative'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/d9b8dd8afebbb0059f5ebea68441254c.png' alt='同事头像' class='w-12 h-12 rounded-full object-cover mr-3'/>
+<span class='absolute -top-1 -right-1 w-5 h-5 bg-danger text-white text-xs rounded-full flex items-center justify-center'>
+        3
+    </span>
+    </div>
+<div class='flex-1 min-w-0'>
+        <div class='flex justify-between items-center mb-1'>
+        <h3 class='font-medium text-gray-800 truncate'>
+        李四
+    </h3>
+<span class='text-xs text-gray-500'>
+        昨天
+    </span>
+    </div>
+<p class='text-sm font-medium text-gray-800 truncate'>
+        项目进度怎么样了？
+    </p>
+    </div>
+    </div>
+<!-- 普通聊天 -->
+<div class='chat-item flex items-center p-3 cursor-pointer hover:bg-gray-100 transition-colors'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/66f7955d9eaf242fac101b061637cc7f.png' alt='家人头像' class='w-12 h-12 rounded-full object-cover mr-3'/>
+<div class='flex-1 min-w-0'>
+        <div class='flex justify-between items-center mb-1'>
+        <h3 class='font-medium text-gray-800 truncate'>
+        王五
+    </h3>
+<span class='text-xs text-gray-500'>
+        周一
+    </span>
+    </div>
+<p class='text-sm text-gray-500 truncate'>
+        周末一起去看电影吧
+    </p>
+    </div>
+    </div>
+<div class='chat-item flex items-center p-3 cursor-pointer hover:bg-gray-100 transition-colors'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/946780b5d55c63a851e16ac7bbde98fc.png' alt='好友头像' class='w-12 h-12 rounded-full object-cover mr-3'/>
+<div class='flex-1 min-w-0'>
+        <div class='flex justify-between items-center mb-1'>
+        <h3 class='font-medium text-gray-800 truncate'>
+        赵六
+    </h3>
+<span class='text-xs text-gray-500'>
+        上周
+    </span>
+    </div>
+<p class='text-sm text-gray-500 truncate'>
+        记得帮我带本书
+    </p>
+    </div>
+    </div>
+<div class='chat-item flex items-center p-3 cursor-pointer hover:bg-gray-100 transition-colors'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/07ee9bd7546231cced99b11e93915dcb.png' alt='同学头像' class='w-12 h-12 rounded-full object-cover mr-3'/>
+<div class='flex-1 min-w-0'>
+        <div class='flex justify-between items-center mb-1'>
+        <h3 class='font-medium text-gray-800 truncate'>
+        孙七
+    </h3>
+<span class='text-xs text-gray-500'>
+        上周
+    </span>
+    </div>
+<p class='text-sm text-gray-500 truncate'>
+        考试复习资料发我一份
+    </p>
+    </div>
+    </div>
+<div class='chat-item flex items-center p-3 cursor-pointer hover:bg-gray-100 transition-colors'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/48f8df4eb3c0d8f0d54575839b9a5a94.png' alt='群聊头像' class='w-12 h-12 rounded-full object-cover mr-3'/>
+<div class='flex-1 min-w-0'>
+        <div class='flex justify-between items-center mb-1'>
+        <h3 class='font-medium text-gray-800 truncate'>
+        前端开发群
+    </h3>
+<span class='text-xs text-gray-500'>
+        09-15
+    </span>
+    </div>
+<p class='text-sm text-gray-500 truncate'>
+        <span class='font-medium text-gray-800'>
+        管理员:
+    </span>
+明天下午3点开会
+    </p>
+    </div>
+    </div>
+<div class='chat-item flex items-center p-3 cursor-pointer hover:bg-gray-100 transition-colors'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/b9ffb257b48263cd1c82251eef256703.png' alt='群聊头像' class='w-12 h-12 rounded-full object-cover mr-3'/>
+<div class='flex-1 min-w-0'>
+        <div class='flex justify-between items-center mb-1'>
+        <h3 class='font-medium text-gray-800 truncate'>
+        游戏爱好者
+    </h3>
+<span class='text-xs text-gray-500'>
+        09-10
+    </span>
+    </div>
+<p class='text-sm text-gray-500 truncate'>
+        <span class='font-medium text-gray-800'>
+        小李:
+    </span>
+今晚开黑吗？
+    </p>
+    </div>
+    </div>
+    </div>
+<!-- [/MODULE] i9j_侧边栏:聊天列表 -- 显示所有聊天会话，包括单聊和群聊，包含头像、名称、最后一条消息、时间和未读消息提示 -->
+    </div>
+<!-- [/MODULE] c3d_侧边栏 -- 包含顶部工具栏、搜索框和聊天列表，用于选择聊天对象 -->
+<!-- [MODULE] k2l_聊天区域 -->
+<div class='flex-1 flex flex-col h-full bg-chat-bg overflow-hidden'>
+        <!-- 聊天未选择状态 -->
+<div id='no-chat-selected' class='flex-1 flex flex-col items-center justify-center p-6 text-center'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/b9d074c7f0279ba8166d12af7f50b183.png' alt='选择聊天' class='w-48 h-48 mb-6 opacity-70'/>
+<h2 class='text-2xl font-semibold text-gray-700 mb-2'>
+        选择一个聊天开始对话
+    </h2>
+<p class='text-gray-500 max-w-md'>
+        从左侧列表中选择一个聊天或联系人开始对话，或搜索新的联系人
+    </p>
+    </div>
+<!-- 聊天内容区域 -->
+<div id='chat-content' class='flex flex-col h-full hidden'>
+        <!-- [MODULE] m4n_聊天区域:顶部信息栏 -->
+<div class='bg-white border-b border-gray-200 p-3 flex items-center justify-between shadow-sm'>
+        <div class='flex items-center'>
+        <button class='md:hidden mr-2 w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors'>
+        <i class='fas fa-arrow-left text-gray-600'>
+        </i>
+    </button>
+<img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/b6bcb2b7c5748b60367007a6bbc2b860.png' alt='好友头像' class='w-10 h-10 rounded-full object-cover mr-3'/>
+<div >
+        <h2 class='font-semibold text-gray-800'>
+        张三
+    </h2>
+<div class='flex items-center text-xs text-success'>
+        <span class='w-2 h-2 bg-success rounded-full mr-1'>
+        </span>
+<span >
+        正在输入...
+    </span>
+    </div>
+    </div>
+    </div>
+<div class='flex space-x-1'>
+        <button class='w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors' title='语音通话'>
+        <i class='fas fa-phone text-gray-600'>
+        </i>
+    </button>
+<button class='w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors' title='视频通话'>
+        <i class='fas fa-video text-gray-600'>
+        </i>
+    </button>
+<button class='w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors' title='更多选项'>
+        <i class='fas fa-ellipsis-v text-gray-600'>
+        </i>
+    </button>
+    </div>
+    </div>
+<!-- [/MODULE] m4n_聊天区域:顶部信息栏 -- 包含聊天对象头像、名称、在线状态、语音通话按钮、视频通话按钮和更多选项按钮 -->
+<!-- [MODULE] o6p_聊天区域:消息列表 -->
+<div id='message-list' class='flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide'>
+        <!-- 日期分隔线 -->
+<div class='flex justify-center'>
+        <span class='px-3 py-1 bg-gray-300/50 text-xs text-gray-600 rounded-full'>
+        今天
+    </span>
+    </div>
+<!-- 对方消息 -->
+<div class='flex items-start'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/e701b075877bc3b68efa4b7b760b50b0.png' alt='好友头像' class='w-8 h-8 rounded-full object-cover mr-2 mt-1 flex-shrink-0'/>
+<div class='max-w-[70%]'>
+        <div class='bg-chat-bubble-left p-3 rounded-lg shadow-sm'>
+        <p class='text-sm'>
+        嗨，你好！最近怎么样？
+    </p>
+    </div>
+<div class='flex justify-end mt-1'>
+        <span class='message-time'>
+        10:20
+    </span>
+    </div>
+    </div>
+    </div>
+<!-- 对方消息 -->
+<div class='flex items-start'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/e701b075877bc3b68efa4b7b760b50b0.png' alt='好友头像' class='w-8 h-8 rounded-full object-cover mr-2 mt1 flex-shrink-0'/>
+<div class='max-w-[70%]'>
+        <div class='bg-chat-bubble-left p-3 rounded-lg shadow-sm'>
+        <p class='text-sm'>
+        项目进展如何？我们需要在周五前完成初稿。
+    </p>
+    </div>
+<div class='flex justify-end mt-1'>
+        <span class='message-time'>
+        10:22
+    </span>
+    </div>
+    </div>
+    </div>
+<!-- 自己消息 -->
+<div class='flex items-start justify-end'>
+        <div class='max-w-[70%]'>
+        <div class='bg-chat-bubble-right p-3 rounded-lg shadow-sm'>
+        <p class='text-sm'>
+        还不错，我已经完成了大部分工作，正在测试中。
+    </p>
+    </div>
+<div class='flex items-center justify-end mt-1'>
+        <span class='message-time mr-1'>
+        10:25
+    </span>
+<i class='fas fa-check-circle text-primary text-xs'>
+        </i>
+    </div>
+    </div>
+    </div>
+<!-- 自己消息 -->
+<div class='flex items-start justify-end'>
+        <div class='max-w-[70%]'>
+        <div class='bg-chat-bubble-right p-3 rounded-lg shadow-sm'>
+        <p class='text-sm'>
+        应该能按时完成，你那边呢？
+    </p>
+    </div>
+<div class='flex items-center justify-end mt-1'>
+        <span class='message-time mr-1'>
+        10:26
+    </span>
+<i class='fas fa-check-circle text-primary text-xs'>
+        </i>
+    </div>
+    </div>
+    </div>
+<!-- 对方消息 -->
+<div class='flex items-start'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/e701b075877bc3b68efa4b7b760b50b0.png' alt='好友头像' class='w-8 h-8 rounded-full object-cover mr-2 mt-1 flex-shrink-0'/>
+<div class='max-w-[70%]'>
+        <div class='bg-chat-bubble-left p-3 rounded-lg shadow-sm'>
+        <p class='text-sm'>
+        我这边也差不多了，就差一些细节调整。
+    </p>
+    </div>
+<div class='flex justify-end mt-1'>
+        <span class='message-time'>
+        10:30
+    </span>
+    </div>
+    </div>
+    </div>
+<!-- 对方消息 -->
+<div class='flex items-start'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/e701b075877bc3b68efa4b7b760b50b0.png' alt='好友头像' class='w-8 h-8 rounded-full object-cover mr-2 mt-1 flex-shrink-0'/>
+<div class='max-w-[70%]'>
+        <div class='bg-chat-bubble-left p-3 rounded-lg shadow-sm'>
+        <p class='text-sm'>
+        对了，周末有空吗？一起去看那个新上映的电影？
+    </p>
+    </div>
+<div class='flex justify-end mt-1'>
+        <span class='message-time'>
+        10:32
+    </span>
+    </div>
+    </div>
+    </div>
+<!-- 自己消息 -->
+<div class='flex items-start justify-end'>
+        <div class='max-w-[70%]'>
+        <div class='bg-chat-bubble-right p-3 rounded-lg shadow-sm'>
+        <p class='text-sm'>
+        好啊！几点的场次？
+    </p>
+    </div>
+<div class='flex items-center justify-end mt-1'>
+        <span class='message-time mr-1'>
+        10:35
+    </span>
+<i class='fas fa-check-circle text-primary text-xs'>
+        </i>
+    </div>
+    </div>
+    </div>
+<!-- 对方消息 -->
+<div class='flex items-start'>
+        <img src='https://design.gemcoder.com/staticResource/echoAiSystemImages/e701b075877bc3b68efa4b7b760b50b0.png' alt='好友头像' class='w-8 h-8 rounded-full object-cover mr-2 mt-1 flex-shrink-0'/>
+<div class='max-w-[70%]'>
+        <div class='bg-chat-bubble-left p-3 rounded-lg shadow-sm'>
+        <p class='text-sm'>
+        下午3点怎么样？我已经查过了，那个时间的座位比较好。
+    </p>
+    </div>
+<div class='flex justify-end mt-1'>
+        <span class='message-time'>
+        14:30
+    </span>
+    </div>
+    </div>
+    </div>
+<!-- 自己消息 -->
+<div class='flex items-start justify-end'>
+        <div class='max-w-[70%]'>
+        <div class='bg-chat-bubble-right p-3 rounded-lg shadow-sm'>
+        <p class='text-sm'>
+        好的，我明白了！
+    </p>
+    </div>
+<div class='flex items-center justify-end mt-1'>
+        <span class='message-time mr-1'>
+        14:32
+    </span>
+<i class='fas fa-check-circle text-primary text-xs'>
+        </i>
+    </div>
+    </div>
+    </div>
+    </div>
+<!-- [/MODULE] o6p_聊天区域:消息列表 -- 显示聊天消息，包括对方和自己发送的消息，包含头像、消息内容、时间戳和已读状态 -->
+<!-- [MODULE] q8r_聊天区域:输入框 -->
+<div class='bg-white p-3 border-t border-gray-200'>
+        <div class='flex items-center mb-2'>
+        <button class='w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors' title='表情'>
+        <i class='fas fa-smile'>
+        </i>
+    </button>
+<button class='w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors' title='图片'>
+        <i class='fas fa-image'>
+        </i>
+    </button>
+<button class='w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors' title='文件'>
+        <i class='fas fa-paperclip'>
+        </i>
+    </button>
+<button class='w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors' title='更多'>
+        <i class='fas fa-plus'>
+        </i>
+    </button>
+    </div>
+<div class='flex items-center'>
+        <textarea id='message-input' rows='1' placeholder='输入消息...' class='flex-1 border border-gray-300 rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none transition-all'>
+        </textarea>
+<button id='send-button' class='ml-3 w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white hover:bg-primary/90 transition-colors'>
+        <i class='fas fa-paper-plane'>
+        </i>
+    </button>
+    </div>
+    </div>
+<!-- [/MODULE] q8r_聊天区域:输入框 -- 包含表情、图片、文件和更多功能按钮，以及消息输入框和发送按钮 -->
+    </div>
+<!-- [/MODULE] k2l_聊天区域 -- 包含聊天未选择状态和聊天内容区域，聊天内容区域包括顶部信息栏、消息列表和输入框 -->
+    </div>
+    </div>
+<!-- [/MODULE] a1b_主内容区域 -- 包含侧边栏和聊天区域，构成完整的局域网聊天室界面 -->
+<!-- [JSMOD] s0t_聊天功能 -->
+<script id='chat-functionality'>document.addEventListener('DOMContentLoaded', function () {
+  // 获取DOM元素
+  var chatItems = document.querySelectorAll('.chat-item');
+  var noChatSelected = document.getElementById('no-chat-selected');
+  var chatContent = document.getElementById('chat-content');
+  var messageInput = document.getElementById('message-input');
+  var sendButton = document.getElementById('send-button');
+  var messageList = document.getElementById('message-list');
+  // 选择聊天
+  chatItems.forEach(function (item) {
+    item.addEventListener('click', function () {
+      // 移除所有活跃状态
+      chatItems.forEach(function (i) {
+        i.classList.remove('active', 'bg-active-chat', 'border-l-4', 'border-primary');
+        i.classList.add('hover:bg-gray-100');
+      });
+
+      // 设置当前聊天为活跃状态
+      item.classList.add('active', 'bg-active-chat', 'border-l-4', 'border-primary');
+      item.classList.remove('hover:bg-gray-100');
+
+      // 显示聊天内容，隐藏未选择状态
+      noChatSelected.classList.add('hidden');
+      chatContent.classList.remove('hidden');
+
+      // 滚动到底部
+      scrollToBottom();
+    });
+  });
+  // 自动调整文本框高度
+  messageInput.addEventListener('input', function () {
+    // 重置高度
+    messageInput.style.height = 'auto';
+    // 设置新高度（最小1行，最大4行）
+    var newHeight = Math.min(messageInput.scrollHeight, 4 * parseInt(getComputedStyle(messageInput).lineHeight));
+    messageInput.style.height = "".concat(newHeight, "px");
+  });
+  // 发送消息
+  function sendMessage() {
+    var message = messageInput.value.trim();
+    if (!message) return;
+
+    // 创建新消息元素
+    var now = new Date();
+    var hours = now.getHours().toString().padStart(2, '0');
+    var minutes = now.getMinutes().toString().padStart(2, '0');
+    var timeString = "".concat(hours, ":").concat(minutes);
+    var messageElement = document.createElement('div');
+    messageElement.className = 'flex items-start justify-end';
+    messageElement.innerHTML = "<div class=\"max-w-[70%]\">\n                        <div class=\"bg-chat-bubble-right p-3 rounded-lg shadow-sm\">\n                            <p class=\"text-sm\">".concat(message, "</p>\n                        </div>\n                        <div class=\"flex items-center justify-end mt-1\">\n                            <span class=\"message-time mr-1\">").concat(timeString, "</span>\n                            <i class=\"fas fa-check-circle text-primary text-xs\"></i>\n                        </div>\n                    </div>");
+
+    // 添加到消息列表
+    messageList.appendChild(messageElement);
+
+    // 清空输入框并重置高度
+    messageInput.value = '';
+    messageInput.style.height = 'auto';
+
+    // 滚动到底部
+    scrollToBottom();
+
+    // 模拟回复（2秒后）
+    setTimeout(function () {
+      simulateReply();
+    }, 2000);
+  }
+
+  // 模拟回复
+  function simulateReply() {
+    var replies = ["好的，我明白了。", "谢谢告知！", "我会处理这个问题。", "我们明天再详细讨论吧。", "这个想法不错！", "我需要一些时间考虑。", "没问题，交给我吧。"];
+    var randomReply = replies[Math.floor(Math.random() * replies.length)];
+    var now = new Date();
+    var hours = now.getHours().toString().padStart(2, '0');
+    var minutes = now.getMinutes().toString().padStart(2, '0');
+    var timeString = "".concat(hours, ":").concat(minutes);
+    var replyElement = document.createElement('div');
+    replyElement.className = 'flex items-start';
+    replyElement.innerHTML = "<img src=\"https://design.gemcoder.com/staticResource/echoAiSystemImages/e701b075877bc3b68efa4b7b760b50b0.png\" alt=\"\u597D\u53CB\u5934\u50CF\" class=\"w-8 h-8 rounded-full object-cover mr-2 mt-1 flex-shrink-0\">\n                    <div class=\"max-w-[70%]\">\n                        <div class=\"bg-chat-bubble-left p-3 rounded-lg shadow-sm\">\n                            <p class=\"text-sm\">".concat(randomReply, "</p>\n                        </div>\n                        <div class=\"flex justify-end mt-1\">\n                            <span class=\"message-time\">").concat(timeString, "</span>\n                        </div>\n                    </div>");
+    messageList.appendChild(replyElement);
+    scrollToBottom();
+  }
+
+  // 滚动到底部
+  function scrollToBottom() {
+    messageList.scrollTop = messageList.scrollHeight;
+  }
+
+  // 点击发送按钮发送消息
+  sendButton.addEventListener('click', sendMessage);
+
+  // 按Enter发送消息，Shift+Enter换行
+  messageInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // 默认选择第一个聊天
+  if (chatItems.length > 0) {
+    chatItems[0].click();
+  }
+});</script>
+<!-- [/MODULE] s0t_聊天功能 -- 处理聊天选择、消息发送、消息显示、文本框高度调整和自动滚动等功能 -->
+    </body>
+    </html>

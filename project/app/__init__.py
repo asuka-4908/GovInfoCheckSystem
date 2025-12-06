@@ -1,7 +1,10 @@
 from flask import Flask
 from flask_login import LoginManager
+from flask_socketio import SocketIO
 from .models import User
 from werkzeug.security import generate_password_hash
+
+socketio = SocketIO()
 from .db import query_all, execute_update, get_connection, query_one
 import os
 import threading
@@ -16,6 +19,7 @@ def create_app():
     login_manager = LoginManager()
     login_manager.login_view = 'auth.login'
     login_manager.init_app(app)
+    socketio.init_app(app, cors_allowed_origins="*")
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -64,11 +68,13 @@ def create_app():
     from .auth import bp as auth_bp
     from .admin import bp as admin_bp
     from .crawler import bp as crawler_bp
+    from .chat import bp as chat_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(crawler_bp)
+    app.register_blueprint(chat_bp)
 
     @app.context_processor
     def inject_settings():

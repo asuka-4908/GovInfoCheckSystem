@@ -2,3 +2,5 @@ Flask>=3.0
 Flask-Login>=0.6.3
 requests>=2.31.0
 beautifulsoup4>=4.12.2
+flask-socketio>=5.3.6
+eventlet>=0.33.3
