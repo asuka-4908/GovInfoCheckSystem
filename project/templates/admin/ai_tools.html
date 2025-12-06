@@ -139,7 +139,7 @@ layui.use(['layer', 'form'], function(){
     document.getElementById('prompt').value = '';
     var ai = pushAiMsg();
     var engId = document.getElementById('engineSelect').value;
-    var url = '/admin/ai_analyze_stream?prompt=' + encodeURIComponent(prompt);
+    var url = '/ai_analyze_stream?prompt=' + encodeURIComponent(prompt);
     if(engId) url += '&engine_id=' + engId;
     try {
       currentES = streamSSEToMarkdown(ai.body, url);
@@ -148,7 +148,7 @@ layui.use(['layer', 'form'], function(){
         console.log("SSE error, switching to fallback demo");
         var fd = new FormData(); fd.append('prompt', prompt);
         if(engId) fd.append('engine_id', engId);
-        fetch('/admin/ai_analyze_demo', {method:'POST', body: fd})
+        fetch('/ai_analyze_demo', {method:'POST', body: fd})
           .then(function(r){ 
             if(!r.ok) throw new Error("HTTP error " + r.status);
             return r.json(); 

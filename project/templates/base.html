@@ -117,6 +117,9 @@
                         <img src="{{ settings.app_logo }}" class="layui-nav-img" alt="avatar">
                         {{ current_user.username }}
                     </a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="{{ url_for('auth.profile') }}">个人中心</a></dd>
+                    </dl>
                 </li>
                 <li class="layui-nav-item"><a href="{{ url_for('auth.logout') }}">退出</a></li>
             </ul>
@@ -129,6 +132,9 @@
                         <a href="javascript:;">系统菜单</a>
                         <dl class="layui-nav-child">
                             <dd><a href="{{ url_for('main.index') }}">首页</a></dd>
+                            <dd><a href="{{ url_for('main.data_board') }}">数据大屏</a></dd>
+                            <dd><a href="{{ url_for('main.crawl_list') }}">数据列表</a></dd>
+                            <dd><a href="{{ url_for('main.ai_tools') }}">AI数据清洗分析</a></dd>
                             {% if current_user.is_admin %}
                             <dd><a href="{{ url_for('admin.user_list') }}">用户管理</a></dd>
                             <dd><a href="{{ url_for('admin.settings') }}">系统设置</a></dd>
@@ -136,9 +142,7 @@
                             <dd><a href="{{ url_for('admin.warehouse') }}">数据仓库管理</a></dd>
                             <dd><a href="{{ url_for('admin.rules') }}">采集规则库</a></dd>
                             <dd><a href="{{ url_for('admin.ai_engines') }}">AI引擎管理</a></dd>
-                            <dd><a href="{{ url_for('admin.ai_tools') }}">AI数据清洗分析</a></dd>
                             <dd><a href="{{ url_for('admin.crawlers') }}">爬虫管理</a></dd>
-                            <dd><a href="{{ url_for('admin.data_board') }}">数据大屏</a></dd>
                             {% endif %}
                         </dl>
                     </li>
@@ -152,6 +156,11 @@
             {% for category, message in messages %}
             {% if category == 'error' %}
             <div class="layui-alert layui-bg-red"
+                style="margin-bottom: 15px; padding: 10px; color: #fff; text-align: center;">
+                {{ message }}
+            </div>
+            {% elif category == 'success' %}
+            <div class="layui-alert layui-bg-green"
                 style="margin-bottom: 15px; padding: 10px; color: #fff; text-align: center;">
                 {{ message }}
             </div>

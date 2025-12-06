@@ -139,12 +139,15 @@
     btn.innerHTML = '<i class="layui-icon layui-icon-loading layui-icon layui-anim layui-anim-rotate layui-anim-loop"></i> 分析中...';
     box.innerHTML = '正在请求AI大模型进行深度分析，请稍候...';
     
-    fetch('/admin/data_board/analyze', {method: 'POST'})
+    var fd = new FormData();
+    fd.append('engine_id', 1);
+
+    fetch('/ai_analyze_demo', {method: 'POST', body: fd})
       .then(function(r){ return r.json(); })
       .then(function(res){
         if(res.code === 0) {
           // Parse Markdown and display directly
-          box.innerHTML = marked.parse(res.data || 'AI未返回有效内容。');
+          box.innerHTML = marked.parse(res.reply || 'AI未返回有效内容。');
         } else {
           box.innerHTML = '<span style="color: #ff5722;">分析失败: ' + (res.msg || '未知错误') + '</span>';
         }
@@ -368,7 +371,7 @@
   }
 
   function loadLatest(){
-    fetch('/admin/data_board/latest').then(function(r){return r.json();}).then(function(res){
+    fetch('/data_board/latest').then(function(r){return r.json();}).then(function(res){
       if(res.code===0){ 
         var rows = res.rows||[];
         var html = '';
@@ -388,11 +391,12 @@
   }
 
   function loadMapData(){
-    fetch('/admin/data_board/heatmap').then(function(r){return r.json();}).then(function(res){
+    fetch('/data_board/heatmap').then(function(r){return r.json();}).then(function(res){
       if(res.code===0){
-        globalData = res;
+        globalData = res.data || res; // handle data wrapper structure if needed
+        if (res.data) globalData = res.data; // Ensure consistent structure access
         renderMap();
-        renderCharts(res);
+        renderCharts(globalData);
       }
     });
   }
